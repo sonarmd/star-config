@@ -13,6 +13,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,7 +48,7 @@ jobs:
         run: node scripts/generate-release-notes.js
 
       - name: Load GPG Key from 1Password
-        if: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN != '' }}
+        if: ${{ env.OP_SERVICE_ACCOUNT_TOKEN != '' }}
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           OP_VAULT: SharedVault
@@ -71,7 +73,7 @@ jobs:
           echo "Loaded GPG key $KEY_ID from 1Password"
 
       - name: Sign checksum (optional)
-        if: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN != '' }}
+        if: ${{ env.OP_SERVICE_ACCOUNT_TOKEN != '' }}
         run: gpg --batch --yes --armor --detach-sign --output dist/checksums.txt.asc dist/checksums.txt
 
       - name: Collect assets
