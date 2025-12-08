@@ -1,0 +1,238 @@
+name: Auto Tag Version
+
+on:
+  pull_request:
+    branches: [master]
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+      - synchronize
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+env:
+  BUMP_DEFAULT: patch
+
+jobs:
+  rc-tag:
+    name: Tag RC on PR
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Create RC tag
+        id: rc
+        env:
+          TAG_SUFFIX: _rc
+          TARGET_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          node <<'NODE'
+          const { execSync } = require("child_process");
+          const fs = require("fs");
+
+          const env = process.env;
+          const targetSha = env.TARGET_SHA;
+          if (!targetSha) {
+            throw new Error("TARGET_SHA is required to create the tag");
+          }
+
+          function run(cmd) {
+            try {
+              return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] }).trim();
+            } catch (error) {
+              if (error.stdout) {
+                console.error(error.stdout.toString());
+              }
+              throw error;
+            }
+          }
+
+          function latestGaTag() {
+            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1");
+            return tag || "v0.0.0";
+          }
+
+          function bumpVersion(version, type) {
+            const parts = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
+            let [major, minor, patch] = parts;
+            if (type === "major") {
+              major += 1;
+              minor = 0;
+              patch = 0;
+            } else if (type === "minor") {
+              minor += 1;
+              patch = 0;
+            } else {
+              patch += 1;
+            }
+            return `${major}.${minor}.${patch}`;
+          }
+
+          const labels = (() => {
+            try {
+              return JSON.parse(env.PR_LABELS || "[]");
+            } catch (error) {
+              console.warn("Failed to parse PR labels, defaulting to empty list");
+              return [];
+            }
+          })();
+          const labelNames = labels.map((label) => (label.name || "").toLowerCase());
+
+          let bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
+          const majorLabels = new Set(["semver:major", "release:major", "version:major", "major"]);
+          const minorLabels = new Set(["semver:minor", "release:minor", "version:minor", "minor"]);
+
+          if (labelNames.some((name) => majorLabels.has(name))) {
+            bumpType = "major";
+          } else if (labelNames.some((name) => minorLabels.has(name))) {
+            bumpType = "minor";
+          }
+
+          const commitMessage = run("git log -1 --pretty=%B").toLowerCase();
+          const prTitle = (env.PR_TITLE || "").toLowerCase();
+          const skipPattern = /\[skip\s+tag\]|\[skip\s+release\]/i;
+
+          if (skipPattern.test(commitMessage) || skipPattern.test(prTitle)) {
+            console.log("Skip directive found (commit or title); exiting without tagging.");
+            process.exit(0);
+          }
+
+          const majorHint = /\[major\]|#major|\bmajor\b/;
+          const minorHint = /\[minor\]|#minor|\bminor\b/;
+
+          if (majorHint.test(commitMessage) || majorHint.test(prTitle)) {
+            bumpType = "major";
+          } else if ((minorHint.test(commitMessage) || minorHint.test(prTitle)) && bumpType !== "major") {
+            bumpType = "minor";
+          }
+
+          const baseTag = latestGaTag();
+          const nextVersion = bumpVersion(baseTag, bumpType);
+          const suffix = env.TAG_SUFFIX || "";
+          const tagName = `v${nextVersion}${suffix}`;
+
+          const existing = run(`git tag -l '${tagName}'`);
+          if (existing) {
+            console.log(`Tag ${tagName} already exists; skipping.`);
+            process.exit(0);
+          }
+
+          run(`git tag ${tagName} ${targetSha}`);
+          run(`git push origin ${tagName}`);
+
+          fs.appendFileSync(env.GITHUB_OUTPUT, `tag=${tagName}\n`);
+          console.log(`Created ${tagName} from ${baseTag} using bump "${bumpType}" at ${targetSha}`);
+          NODE
+
+      - name: Tag summary
+        if: steps.rc.outputs.tag != ''
+        run: echo "Created ${{ steps.rc.outputs.tag }}"
+
+  ga-tag:
+    name: Tag GA on master push
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GA tag
+        id: ga
+        env:
+          TAG_SUFFIX: ""
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          node <<'NODE'
+          const { execSync } = require("child_process");
+          const fs = require("fs");
+
+          const env = process.env;
+          const targetSha = env.TARGET_SHA;
+          if (!targetSha) {
+            throw new Error("TARGET_SHA is required to create the tag");
+          }
+
+          function run(cmd) {
+            try {
+              return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] }).trim();
+            } catch (error) {
+              if (error.stdout) {
+                console.error(error.stdout.toString());
+              }
+              throw error;
+            }
+          }
+
+          function latestGaTag() {
+            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1");
+            return tag || "v0.0.0";
+          }
+
+          function bumpVersion(version, type) {
+            const parts = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
+            let [major, minor, patch] = parts;
+            if (type === "major") {
+              major += 1;
+              minor = 0;
+              patch = 0;
+            } else if (type === "minor") {
+              minor += 1;
+              patch = 0;
+            } else {
+              patch += 1;
+            }
+            return `${major}.${minor}.${patch}`;
+          }
+
+          let bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
+          const commitMessage = run("git log -1 --pretty=%B").toLowerCase();
+          const skipPattern = /\[skip\s+tag\]|\[skip\s+release\]/i;
+
+          if (skipPattern.test(commitMessage)) {
+            console.log("Skip directive found in commit message; exiting without tagging.");
+            process.exit(0);
+          }
+
+          const majorHint = /\[major\]|#major|\bmajor\b/;
+          const minorHint = /\[minor\]|#minor|\bminor\b/;
+
+          if (majorHint.test(commitMessage)) {
+            bumpType = "major";
+          } else if (minorHint.test(commitMessage) && bumpType !== "major") {
+            bumpType = "minor";
+          }
+
+          const baseTag = latestGaTag();
+          const nextVersion = bumpVersion(baseTag, bumpType);
+          const suffix = env.TAG_SUFFIX || "";
+          const tagName = `v${nextVersion}${suffix}`;
+
+          const existing = run(`git tag -l '${tagName}'`);
+          if (existing) {
+            console.log(`Tag ${tagName} already exists; skipping.`);
+            process.exit(0);
+          }
+
+          run(`git tag ${tagName} ${targetSha}`);
+          run(`git push origin ${tagName}`);
+
+          fs.appendFileSync(env.GITHUB_OUTPUT, `tag=${tagName}\n`);
+          console.log(`Created ${tagName} from ${baseTag} using bump "${bumpType}" at ${targetSha}`);
+          NODE
+
+      - name: Tag summary
+        if: steps.ga.outputs.tag != ''
+        run: echo "Created ${{ steps.ga.outputs.tag }}"
