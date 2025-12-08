@@ -63,6 +63,25 @@ Packages:
 ### Release flow & integrity
 
 - Tags drive releases: `v*.*.*_rc` (release candidates) and `v*.*.*` (GA) trigger `.github/workflows/release.yml`.
-- The release workflow uses Yarn to pack every workspace, computes SHA-256 for each tarball, optionally signs `checksums.txt` when `GPG_PRIVATE_KEY`/`GPG_PASSPHRASE` secrets are present, and publishes a GitHub release (prerelease for RCs) with all tarballs plus checksums.
+- The release workflow uses Yarn to pack every workspace, computes SHA-256 for each tarball, imports the signing key from 1Password (document `GPG-Signing-Key` in vault `SharedVault`, available via `OP_SERVICE_ACCOUNT_TOKEN`), signs `checksums.txt` when the key is present, and publishes a GitHub release (prerelease for RCs) with all tarballs plus checksums.
 - Release notes include: commit SHA, commit signature fingerprint/algorithm/state (SSH-signed commits are required), per-package tarball name/checksum, and full dependency version lists for every package.
 - `integrity-log.md` stays append-only and should be updated manually (e.g., pre-commit) with commit hash, checksum, and signer fingerprint; never rewrite existing entries.
+
+### Release signing setup (1Password + GPG)
+
+- CI expects a GPG private key stored as a 1Password **document** titled `GPG-Signing-Key` in vault `SharedVault`, readable by the service account whose token is `OP_SERVICE_ACCOUNT_TOKEN`.
+- To generate and publish a new key locally, run the helper (adjust vault/title if you use a different one):
+  ```bash
+  GPG_NAME="Anthony Vespoli" \
+  GPG_EMAIL="avespoli@sonarmd.com" \
+  OP_VAULT="SharedVault" \
+  OP_ITEM_TITLE="GPG-Signing-Key" \
+  ./scripts/generate_secret.sh
+  ```
+  It creates an ed25519 signing key (2y expiry), uploads the public key to your GitHub account, stores the armored private key as a 1Password document, and sets your git signing config to that key.
+- If you already have a key, you can export and store it directly:
+  ```bash
+  gpg --armor --export-secret-key <KEY_ID> > /tmp/gpg.asc
+  op document create /tmp/gpg.asc --title "GPG-Signing-Key" --vault "SharedVault"
+  ```
+- On release runners, the workflow installs `op`, pulls that document into `gpg --import`, configures git signing with the imported key ID, and signs `dist/checksums.txt` before publishing the release. If your vault/item name differs, update `OP_VAULT`/`OP_GPG_ITEM` in `.github/workflows/release.yml` to match.

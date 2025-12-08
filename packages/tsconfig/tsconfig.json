@@ -18,6 +18,9 @@
       ],
       "@interfaces": [
         "./Interfaces"
+      ],
+      "@configs": [
+        "./*.config.ts"
       ]
     },
     "lib": [
