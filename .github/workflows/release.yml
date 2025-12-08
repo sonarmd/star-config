@@ -57,16 +57,22 @@ jobs:
           commit=$(git rev-parse "refs/tags/${{ steps.tag.outputs.tag_name }}^{commit}")
           echo "commit_sha=$commit" >> "$GITHUB_OUTPUT"
 
+      - name: Init log
+        run: |
+          mkdir -p dist
+          : > dist/release.log
+          echo "log_file=dist/release.log" >> "$GITHUB_OUTPUT"
+
       - name: Use Node.js
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
           node-version: 20
 
       - name: Yarn version
-        run: yarn --version
+        run: yarn --version | tee -a dist/release.log
 
       - name: Pack workspaces and checksums
-        run: node scripts/pack-and-checksum.js
+        run: node scripts/pack-and-checksum.js | tee -a dist/release.log
 
       - name: Generate release notes
         env:
@@ -75,53 +81,156 @@ jobs:
           PACKAGES_FILE: dist/pack-output.json
           CHECKSUMS_FILE: dist/checksums.txt
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/generate-release-notes.js
+        run: node scripts/generate-release-notes.js | tee -a dist/release.log
 
       - name: Load GPG Key from 1Password
+        id: gpg
         if: ${{ env.OP_SERVICE_ACCOUNT_TOKEN != '' }}
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ env.OP_SERVICE_ACCOUNT_TOKEN }}
           OP_VAULT: CI/CD
           OP_GPG_ITEM: GPG-Signing-Key
           OP_GPG_ITEM_ID: ${{ secrets.OP_GPG_ITEM_ID }}
+          OP_GPG_EXPECTED_FPR: ${{ secrets.OP_GPG_EXPECTED_FPR }}
+          LOG_FILE: dist/release.log
         run: |
-          # Install 1Password CLI
+          set -euo pipefail
+
+          log() {
+            local msg="$1"
+            printf '[%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$msg" | tee -a "$LOG_FILE"
+          }
+
+          mkdir -p "$(dirname "$LOG_FILE")"
+          touch "$LOG_FILE"
+
+          log "Installing 1Password CLI"
           curl -sS https://downloads.1password.com/linux/debian/amd64/stable/1password-cli-amd64-latest.deb -o op.deb
           sudo dpkg -i op.deb
 
-          # Resolve the item to use (ID takes precedence; otherwise ensure a single match)
-          ITEM_TO_USE="$OP_GPG_ITEM"
+          GNUPGHOME_INSPECT="$(mktemp -d)"
+          export GNUPGHOME="$GNUPGHOME_INSPECT"
+
+          list_ids() {
+            op item list --vault "$OP_VAULT" --format json | jq -r --arg name "$OP_GPG_ITEM" '.[] | select(.title==$name) | "\(.id)\t\(.createdAt)"'
+          }
+
+          fingerprint_for() {
+            local item_id="$1"
+            op document get "$item_id" --vault="$OP_VAULT" \
+              | gpg --batch --import-options show-only --with-colons --import 2>/dev/null \
+              | awk -F: '/^fpr:/{print $10; exit}'
+          }
+
+          ITEM_TO_USE=""
+          declare -A FPR_BY_ID
+          declare -A CREATED_BY_ID
+
           if [ -n "${OP_GPG_ITEM_ID:-}" ]; then
             ITEM_TO_USE="$OP_GPG_ITEM_ID"
+          fi
+
+          mapfile -t matches < <(list_ids)
+
+          if [ ${#matches[@]} -eq 0 ] && [ -z "$ITEM_TO_USE" ]; then
+            log "No GPG item found; generating new key"
+            NEW_NAME="${GPG_NAME:-CI Release Key}"
+            NEW_EMAIL="${GPG_EMAIL:-ci@sonarmd.com}"
+            NEW_EXPIRE="${GPG_EXPIRE:-5m}" # months -> gpg accepts e.g., 5m
+            gpg --batch --yes --passphrase '' --quick-generate-key "$NEW_NAME <$NEW_EMAIL>" ed25519 sign "$NEW_EXPIRE"
+            NEW_KEY_ID="$(gpg --list-secret-keys --keyid-format=long "$NEW_EMAIL" | awk '/^sec/{print $2}' | sed 's#.*/##' | head -n1)"
+            PUB_TMP="$(mktemp)"
+            PRIV_TMP="$(mktemp)"
+            gpg --armor --export "$NEW_KEY_ID" > "$PUB_TMP"
+            gpg --armor --export-secret-key "$NEW_KEY_ID" > "$PRIV_TMP"
+            ITEM_JSON="$(op document create "$PRIV_TMP" --vault "$OP_VAULT" --title "$OP_GPG_ITEM" --format json)"
+            ITEM_TO_USE="$(echo "$ITEM_JSON" | jq -r '.id // .uuid')"
+            log "Generated new key $NEW_KEY_ID and stored as $ITEM_TO_USE"
           else
-            matches="$(op item list --vault "$OP_VAULT" --format json | jq -r --arg name "$OP_GPG_ITEM" '.[] | select(.title==$name) | .id')"
-            count=$(echo "$matches" | grep -c . || true)
-            if [ "$count" -gt 1 ]; then
-              echo "Multiple 1Password items titled \"$OP_GPG_ITEM\" found in vault \"$OP_VAULT\". Set secret OP_GPG_ITEM_ID to one of:" >&2
-              echo "$matches" >&2
-              exit 1
-            elif [ "$count" -eq 1 ]; then
-              ITEM_TO_USE="$matches"
+            log "Discovered ${#matches[@]} items titled \"$OP_GPG_ITEM\""
+            for row in "${matches[@]}"; do
+              id="${row%%$'\t'*}"
+              created="${row#*$'\t'}"
+              fpr="$(fingerprint_for "$id" || true)"
+              FPR_BY_ID["$id"]="$fpr"
+              CREATED_BY_ID["$id"]="$created"
+              log "Candidate item $id created $created fingerprint $fpr"
+            done
+
+            if [ -z "$ITEM_TO_USE" ]; then
+              if [ -n "${OP_GPG_EXPECTED_FPR:-}" ]; then
+                for id in "${!FPR_BY_ID[@]}"; do
+                  if [ "${FPR_BY_ID[$id]}" = "$OP_GPG_EXPECTED_FPR" ]; then
+                    ITEM_TO_USE="$id"
+                    log "Selected expected fingerprint $OP_GPG_EXPECTED_FPR at item $id"
+                    break
+                  fi
+                done
+              fi
+            fi
+
+            if [ -z "$ITEM_TO_USE" ]; then
+              # pick oldest by createdAt
+              oldest_id=""
+              oldest_created=""
+              for id in "${!CREATED_BY_ID[@]}"; do
+                ts="${CREATED_BY_ID[$id]}"
+                if [ -z "$oldest_created" ] || [[ "$ts" < "$oldest_created" ]]; then
+                  oldest_created="$ts"
+                  oldest_id="$id"
+                fi
+              done
+              ITEM_TO_USE="$oldest_id"
+              log "Selected oldest item $ITEM_TO_USE created $oldest_created"
+            fi
+
+            # Delete exact duplicates (same fingerprint) other than the kept item
+            keep_fpr="${FPR_BY_ID[$ITEM_TO_USE]}"
+            if [ -n "$keep_fpr" ]; then
+              for id in "${!FPR_BY_ID[@]}"; do
+                if [ "$id" != "$ITEM_TO_USE" ] && [ "${FPR_BY_ID[$id]}" = "$keep_fpr" ]; then
+                  log "Deleting duplicate item $id with same fingerprint $keep_fpr"
+                  op item delete "$id" --vault "$OP_VAULT" --archive
+                fi
+              done
             fi
           fi
 
-          # Get the GPG key directly into GPG - never hits disk
+          if [ -z "$ITEM_TO_USE" ]; then
+            log "No usable GPG item found after processing."
+            exit 1
+          fi
+
+          # Switch to default GNUPGHOME for actual import/signing
+          unset GNUPGHOME
+          log "Importing key from item $ITEM_TO_USE"
           op document get "$ITEM_TO_USE" --vault="$OP_VAULT" | gpg --batch --import
 
-          # Configure git
           KEY_ID=$(
             gpg --list-secret-keys --keyid-format LONG \
               | awk '/^sec/{print $2}' \
               | cut -d'/' -f2 \
               | head -n1
           )
+          KEY_FPR=$(
+            gpg --list-secret-keys --with-colons \
+              | awk -F: '/^fpr:/{print $10; exit}'
+          )
+
+          if [ -n "${OP_GPG_EXPECTED_FPR:-}" ] && [ "$OP_GPG_EXPECTED_FPR" != "$KEY_FPR" ]; then
+            log "Loaded fingerprint $KEY_FPR does not match expected $OP_GPG_EXPECTED_FPR"
+            exit 1
+          fi
+
           git config --global user.signingkey "$KEY_ID"
           git config --global commit.gpgsign true
-          echo "Loaded GPG key $KEY_ID from 1Password"
+          log "Loaded GPG key $KEY_ID fingerprint $KEY_FPR from 1Password item $ITEM_TO_USE"
+          echo "key_id=$KEY_ID" >> "$GITHUB_OUTPUT"
+          echo "fingerprint=$KEY_FPR" >> "$GITHUB_OUTPUT"
 
       - name: Sign checksum (optional)
         if: ${{ env.OP_SERVICE_ACCOUNT_TOKEN != '' }}
-        run: gpg --batch --yes --armor --detach-sign --output dist/checksums.txt.asc dist/checksums.txt
+        run: gpg --batch --yes --armor --detach-sign --output dist/checksums.txt.asc dist/checksums.txt | tee -a dist/release.log
 
       - name: Collect assets
         id: assets
@@ -129,6 +238,9 @@ jobs:
           files=$(paste -sd' ' dist/assets.txt)
           if [ -f dist/checksums.txt.asc ]; then
             files="$files dist/checksums.txt.asc"
+          fi
+          if [ -f dist/release.log ]; then
+            files="$files dist/release.log"
           fi
           echo "files=$files" >> "$GITHUB_OUTPUT"
 
@@ -145,3 +257,20 @@ jobs:
             --title "Release $TAG_NAME" \
             --notes-file release-notes.md \
             --prerelease=$prerelease
+
+      - name: Release summary
+        env:
+          TAG_NAME: ${{ steps.tag.outputs.tag_name }}
+          COMMIT_SHA: ${{ steps.resolve.outputs.commit_sha }}
+          KEY_ID: ${{ steps.gpg.outputs.key_id }}
+          KEY_FPR: ${{ steps.gpg.outputs.fingerprint }}
+        run: |
+          {
+            echo "## Release"
+            echo "- Tag: $TAG_NAME"
+            echo "- Commit: $COMMIT_SHA"
+            if [ -n "$KEY_ID" ]; then
+              echo "- GPG key: $KEY_ID ($KEY_FPR)"
+            fi
+            echo "- Assets: ${{ steps.assets.outputs.files }}"
+          } >> "$GITHUB_STEP_SUMMARY"

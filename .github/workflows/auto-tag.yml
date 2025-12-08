@@ -12,16 +12,23 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      release_channel:
+        description: "Release channel"
+        required: true
+        default: "rc"
+        type: choice
+        options:
+          - rc
+          - ga
       bump_type:
-        description: "Version bump type (major, minor, patch)"
+        description: "Version bump type"
         required: false
         default: "patch"
-        type: string
-      tag_suffix:
-        description: "Optional tag suffix (e.g., _rc)"
-        required: false
-        default: ""
-        type: string
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
@@ -74,6 +81,35 @@ jobs:
           function latestGaTag() {
             const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1");
             return tag || "v0.0.0";
+          }
+
+          function latestRcTag() {
+            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
+            return tag;
+          }
+
+          function latestRcTag() {
+            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
+            return tag;
+          }
+
+          function latestRcBase() {
+            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
+            return tag ? tag.replace(/_rc$/, "") : "";
+          }
+
+          function versionTuple(v) {
+            return v.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
+          }
+
+          function greaterVersion(a, b) {
+            const ta = versionTuple(a);
+            const tb = versionTuple(b);
+            for (let i = 0; i < 3; i += 1) {
+              if (ta[i] > tb[i]) return a;
+              if (ta[i] < tb[i]) return b;
+            }
+            return a;
           }
 
           function bumpVersion(version, type) {
@@ -130,7 +166,9 @@ jobs:
             bumpType = "minor";
           }
 
-          const baseTag = latestGaTag();
+          const gaBase = latestGaTag();
+          const rcBase = latestRcBase() || gaBase;
+          const baseTag = greaterVersion(gaBase, rcBase);
           const nextVersion = bumpVersion(baseTag, bumpType);
           const suffix = env.TAG_SUFFIX || "";
           const tagName = `v${nextVersion}${suffix}`;
@@ -150,7 +188,13 @@ jobs:
 
       - name: Tag summary
         if: steps.rc.outputs.tag != ''
-        run: echo "Created ${{ steps.rc.outputs.tag }}"
+        run: |
+          echo "Created ${{ steps.rc.outputs.tag }}"
+          {
+            echo "## Auto-tag RC"
+            echo "- Tag: ${{ steps.rc.outputs.tag }}"
+            echo "- Commit: ${{ github.event.pull_request.head.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Trigger release workflow
         if: steps.rc.outputs.tag != ''
@@ -162,14 +206,14 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
             https://api.github.com/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches \
-            -d "{\"ref\":\"master\",\"inputs\":{\"tag_name\":\"${TAG_NAME}\"}}"
+            -d "{\"ref\":\"main\",\"inputs\":{\"tag_name\":\"${TAG_NAME}\"}}"
 
   ga-tag:
-    name: Tag GA on master push
+    name: Tag GA on main push
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout master
+      - name: Checkout main
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
@@ -222,28 +266,41 @@ jobs:
             return `${major}.${minor}.${patch}`;
           }
 
-          let bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
-          const commitMessage = run("git log -1 --pretty=%B").toLowerCase();
-          const skipPattern = /\[skip\s+tag\]|\[skip\s+release\]/i;
+          // Prefer promoting the latest RC (same version, without bump)
+          const latestRc = latestRcTag();
+          let tagName = "";
+          if (latestRc) {
+            const base = latestRc.replace(/_rc$/, "");
+            const existing = run(`git tag -l '${base}'`);
+            if (existing) {
+              console.log(`GA tag ${base} already exists; skipping.`);
+              process.exit(0);
+            }
+            tagName = base;
+          } else {
+            let bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
+            const commitMessage = run("git log -1 --pretty=%B").toLowerCase();
+            const skipPattern = /\[skip\s+tag\]|\[skip\s+release\]/i;
 
-          if (skipPattern.test(commitMessage)) {
-            console.log("Skip directive found in commit message; exiting without tagging.");
-            process.exit(0);
+            if (skipPattern.test(commitMessage)) {
+              console.log("Skip directive found in commit message; exiting without tagging.");
+              process.exit(0);
+            }
+
+            const majorHint = /\[major\]|#major|\bmajor\b/;
+            const minorHint = /\[minor\]|#minor|\bminor\b/;
+
+            if (majorHint.test(commitMessage)) {
+              bumpType = "major";
+            } else if (minorHint.test(commitMessage) && bumpType !== "major") {
+              bumpType = "minor";
+            }
+
+            const baseTag = latestGaTag();
+            const nextVersion = bumpVersion(baseTag, bumpType);
+            const suffix = env.TAG_SUFFIX || "";
+            tagName = `v${nextVersion}${suffix}`;
           }
-
-          const majorHint = /\[major\]|#major|\bmajor\b/;
-          const minorHint = /\[minor\]|#minor|\bminor\b/;
-
-          if (majorHint.test(commitMessage)) {
-            bumpType = "major";
-          } else if (minorHint.test(commitMessage) && bumpType !== "major") {
-            bumpType = "minor";
-          }
-
-          const baseTag = latestGaTag();
-          const nextVersion = bumpVersion(baseTag, bumpType);
-          const suffix = env.TAG_SUFFIX || "";
-          const tagName = `v${nextVersion}${suffix}`;
 
           const existing = run(`git tag -l '${tagName}'`);
           if (existing) {
@@ -260,7 +317,13 @@ jobs:
 
       - name: Tag summary
         if: steps.ga.outputs.tag != ''
-        run: echo "Created ${{ steps.ga.outputs.tag }}"
+        run: |
+          echo "Created ${{ steps.ga.outputs.tag }}"
+          {
+            echo "## Auto-tag GA"
+            echo "- Tag: ${{ steps.ga.outputs.tag }}"
+            echo "- Commit: ${{ github.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Trigger release workflow
         if: steps.ga.outputs.tag != ''
@@ -272,23 +335,23 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
             https://api.github.com/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches \
-            -d "{\"ref\":\"master\",\"inputs\":{\"tag_name\":\"${TAG_NAME}\"}}"
+            -d "{\"ref\":\"main\",\"inputs\":{\"tag_name\":\"${TAG_NAME}\"}}"
 
   manual-tag:
     name: Tag manually
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout master
+      - name: Checkout main
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
-          ref: master
+          ref: main
 
       - name: Create manual tag
         id: manual
         env:
-          TAG_SUFFIX: ${{ github.event.inputs.tag_suffix }}
+          RELEASE_CHANNEL: ${{ github.event.inputs.release_channel }}
           BUMP_DEFAULT: ${{ github.event.inputs.bump_type }}
         run: |
           TARGET_SHA=$(git rev-parse HEAD)
@@ -319,6 +382,11 @@ jobs:
             return tag || "v0.0.0";
           }
 
+          function latestRcTag() {
+            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
+            return tag;
+          }
+
           function bumpVersion(version, type) {
             const parts = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
             let [major, minor, patch] = parts;
@@ -335,12 +403,25 @@ jobs:
             return `${major}.${minor}.${patch}`;
           }
 
-          let bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
+          let tagName = "";
+          const channel = (env.RELEASE_CHANNEL || "rc").toLowerCase();
 
-          const baseTag = latestGaTag();
-          const nextVersion = bumpVersion(baseTag, bumpType);
-          const suffix = env.TAG_SUFFIX || "";
-          const tagName = `v${nextVersion}${suffix}`;
+          if (channel === "ga") {
+            const rc = latestRcTag();
+            if (rc) {
+              tagName = rc.replace(/_rc$/, "");
+            } else {
+              const baseTag = latestGaTag();
+              const bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
+              const nextVersion = bumpVersion(baseTag, bumpType);
+              tagName = `v${nextVersion}`;
+            }
+          } else {
+            const baseTag = latestGaTag();
+            const bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
+            const nextVersion = bumpVersion(baseTag, bumpType);
+            tagName = `v${nextVersion}_rc`;
+          }
 
           const existing = run(`git tag -l '${tagName}'`);
           if (existing) {
@@ -357,7 +438,15 @@ jobs:
 
       - name: Tag summary
         if: steps.manual.outputs.tag != ''
-        run: echo "Created ${{ steps.manual.outputs.tag }}"
+        run: |
+          echo "Created ${{ steps.manual.outputs.tag }}"
+          {
+            echo "## Manual tag"
+            echo "- Tag: ${{ steps.manual.outputs.tag }}"
+            echo "- Commit: ${TARGET_SHA:-$(git rev-parse HEAD)}"
+            echo "- Channel: ${{ github.event.inputs.release_channel }}"
+            echo "- Bump: ${{ github.event.inputs.bump_type }}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Trigger release workflow
         if: steps.manual.outputs.tag != ''
@@ -369,4 +458,4 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
             https://api.github.com/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches \
-            -d "{\"ref\":\"master\",\"inputs\":{\"tag_name\":\"${TAG_NAME}\"}}"
+            -d "{\"ref\":\"main\",\"inputs\":{\"tag_name\":\"${TAG_NAME}\"}}"
