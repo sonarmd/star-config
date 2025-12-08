@@ -1,22 +1,61 @@
 {
-  "name": "eslint-config-triggr",
+  "name": "@sonarmd/star-config",
   "version": "1.0.0",
-  "description": "Common ESLint configs for Triggr Health",
+  "description": "SonarMD zero-config tooling suite: ESLint, Prettier, lint-staged, git hooks, TypeScript config, and scripts.",
+  "type": "commonjs",
   "main": "index.js",
+  "bin": {
+    "star-config": "./scripts/bootstrap.js"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "setup": "node scripts/bootstrap.js",
+    "postinstall": "node scripts/add-precommit-hook.js",
+    "test": "node -e \"console.log('no tests')\""
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/triggr/eslint-config-triggr.git"
+    "url": "git+https://github.com/sonarmd/star-config.git"
   },
-  "author": "Triggr Health",
+  "author": "SonarMD",
   "license": "UNLICENSED",
   "bugs": {
-    "url": "https://github.com/triggr/eslint-config-triggr/issues"
+    "url": "https://github.com/sonarmd/star-config/issues"
   },
-  "homepage": "https://github.com/triggr/eslint-config-triggr#readme",
+  "homepage": "https://github.com/sonarmd/star-config#readme",
+  "exports": {
+    ".": "./index.js",
+    "./eslint": "./index.js",
+    "./eslint/legacy": "./legacy.js",
+    "./prettier": "./prettier.config.cjs",
+    "./lint-staged": "./lint-staged.config.js",
+    "./githooks": "./githooks.config.js",
+    "./tsconfig": "./tsconfig.json",
+    "./scripts/run-lint-staged": "./scripts/run-lint-staged.js",
+    "./scripts/add-precommit-hook": "./scripts/add-precommit-hook.js"
+  },
+  "files": [
+    "index.js",
+    "legacy.js",
+    "prettier.config.cjs",
+    "lint-staged.config.js",
+    "githooks.config.js",
+    "tsconfig.json",
+    "scripts",
+    "README.md"
+  ],
   "peerDependencies": {
-    "eslint": ">= 4"
+    "eslint": "^9.0.0 || ^8.57.0",
+    "prettier": "^3.3.0",
+    "lint-staged": "^15.0.0",
+    "typescript": ">=4.9.0",
+    "husky": "^9.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    },
+    "husky": {
+      "optional": true
+    }
   }
 }
