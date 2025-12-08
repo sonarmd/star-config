@@ -10,6 +10,18 @@ on:
       - synchronize
   push:
     branches: [master]
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: "Version bump type (major, minor, patch)"
+        required: false
+        default: "patch"
+        type: string
+      tag_suffix:
+        description: "Optional tag suffix (e.g., _rc)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -236,3 +248,88 @@ jobs:
       - name: Tag summary
         if: steps.ga.outputs.tag != ''
         run: echo "Created ${{ steps.ga.outputs.tag }}"
+
+  manual-tag:
+    name: Tag manually
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+          ref: master
+
+      - name: Create manual tag
+        id: manual
+        env:
+          TAG_SUFFIX: ${{ github.event.inputs.tag_suffix }}
+          BUMP_DEFAULT: ${{ github.event.inputs.bump_type }}
+        run: |
+          TARGET_SHA=$(git rev-parse HEAD)
+          export TARGET_SHA
+          node <<'NODE'
+          const { execSync } = require("child_process");
+          const fs = require("fs");
+
+          const env = process.env;
+          const targetSha = env.TARGET_SHA;
+          if (!targetSha) {
+            throw new Error("TARGET_SHA is required to create the tag");
+          }
+
+          function run(cmd) {
+            try {
+              return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] }).trim();
+            } catch (error) {
+              if (error.stdout) {
+                console.error(error.stdout.toString());
+              }
+              throw error;
+            }
+          }
+
+          function latestGaTag() {
+            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1");
+            return tag || "v0.0.0";
+          }
+
+          function bumpVersion(version, type) {
+            const parts = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
+            let [major, minor, patch] = parts;
+            if (type === "major") {
+              major += 1;
+              minor = 0;
+              patch = 0;
+            } else if (type === "minor") {
+              minor += 1;
+              patch = 0;
+            } else {
+              patch += 1;
+            }
+            return `${major}.${minor}.${patch}`;
+          }
+
+          let bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
+
+          const baseTag = latestGaTag();
+          const nextVersion = bumpVersion(baseTag, bumpType);
+          const suffix = env.TAG_SUFFIX || "";
+          const tagName = `v${nextVersion}${suffix}`;
+
+          const existing = run(`git tag -l '${tagName}'`);
+          if (existing) {
+            console.log(`Tag ${tagName} already exists; skipping.`);
+            process.exit(0);
+          }
+
+          run(`git tag ${tagName} ${targetSha}`);
+          run(`git push origin ${tagName}`);
+
+          fs.appendFileSync(env.GITHUB_OUTPUT, `tag=${tagName}\n`);
+          console.log(`Created ${tagName} from ${baseTag} using bump "${bumpType}" at ${targetSha}`);
+          NODE
+
+      - name: Tag summary
+        if: steps.manual.outputs.tag != ''
+        run: echo "Created ${{ steps.manual.outputs.tag }}"
