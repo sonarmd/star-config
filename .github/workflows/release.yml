@@ -83,13 +83,30 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ env.OP_SERVICE_ACCOUNT_TOKEN }}
           OP_VAULT: CI/CD
           OP_GPG_ITEM: GPG-Signing-Key
+          OP_GPG_ITEM_ID: ${{ secrets.OP_GPG_ITEM_ID }}
         run: |
           # Install 1Password CLI
           curl -sS https://downloads.1password.com/linux/debian/amd64/stable/1password-cli-amd64-latest.deb -o op.deb
           sudo dpkg -i op.deb
 
+          # Resolve the item to use (ID takes precedence; otherwise ensure a single match)
+          ITEM_TO_USE="$OP_GPG_ITEM"
+          if [ -n "${OP_GPG_ITEM_ID:-}" ]; then
+            ITEM_TO_USE="$OP_GPG_ITEM_ID"
+          else
+            matches="$(op item list --vault "$OP_VAULT" --format json | jq -r --arg name "$OP_GPG_ITEM" '.[] | select(.title==$name) | .id')"
+            count=$(echo "$matches" | grep -c . || true)
+            if [ "$count" -gt 1 ]; then
+              echo "Multiple 1Password items titled \"$OP_GPG_ITEM\" found in vault \"$OP_VAULT\". Set secret OP_GPG_ITEM_ID to one of:" >&2
+              echo "$matches" >&2
+              exit 1
+            elif [ "$count" -eq 1 ]; then
+              ITEM_TO_USE="$matches"
+            fi
+          fi
+
           # Get the GPG key directly into GPG - never hits disk
-          op document get "$OP_GPG_ITEM" --vault="$OP_VAULT" | gpg --batch --import
+          op document get "$ITEM_TO_USE" --vault="$OP_VAULT" | gpg --batch --import
 
           # Configure git
           KEY_ID=$(

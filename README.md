@@ -10,6 +10,7 @@ Packages:
 - `@sonarmd/tsconfig`
 - `@sonarmd/scripts` (run-lint-staged, add-precommit-hook)
 - `@sonarmd/star-config` (meta; depends on all of the above)
+- Unscoped aliases (same contents, unscoped names): `eslint-config-sonarmd`, `prettier-config-sonarmd`, `lint-staged-config-sonarmd`, `githooks-config-sonarmd`, `tsconfig-sonarmd`, `scripts-sonarmd`, `star-config-sonarmd` (meta)
 
 ### Install
 
@@ -17,9 +18,17 @@ Packages:
   ```bash
   yarn add -D @sonarmd/star-config
   ```
+- Full suite (unscoped alias names):
+  ```bash
+  yarn add -D star-config-sonarmd
+  ```
 - Individual packages (pick what you need):
   ```bash
   yarn add -D @sonarmd/eslint-config @sonarmd/prettier-config @sonarmd/lint-staged-config @sonarmd/githooks-config @sonarmd/tsconfig @sonarmd/scripts
+  ```
+- Individual packages (unscoped aliases):
+  ```bash
+  yarn add -D eslint-config-sonarmd prettier-config-sonarmd lint-staged-config-sonarmd githooks-config-sonarmd tsconfig-sonarmd scripts-sonarmd
   ```
 - Required peer deps (project-level):
   ```bash
@@ -27,6 +36,8 @@ Packages:
   ```
 
 ### Usage
+
+(Swap `@sonarmd/...` for the matching `...-sonarmd` alias if you prefer unscoped names.)
 
 - ESLint (modern):
   ```json

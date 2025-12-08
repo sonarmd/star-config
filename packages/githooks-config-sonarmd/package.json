@@ -1,0 +1,20 @@
+{
+  "name": "githooks-config-sonarmd",
+  "version": "1.0.0",
+  "description": "Alias wrapper for @sonarmd/githooks-config.",
+  "main": "githooks.config.js",
+  "exports": {
+    ".": "./githooks.config.js"
+  },
+  "files": [
+    "githooks.config.js"
+  ],
+  "author": "SonarMD",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@sonarmd/githooks-config": "1.0.0"
+  },
+  "peerDependencies": {
+    "lint-staged": "^15.0.0"
+  }
+}
