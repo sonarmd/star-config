@@ -1,4 +1,3 @@
 # Integrity log
 
-Append-only ledger maintained by CI. Entries are added on each push to record the commit, packed tarball, checksum, and declared SSH public keys. Do not edit or reorder existing entries.
-
+Append-only ledger. Update manually (e.g., pre-commit) to record the commit, all packed tarballs, checksums, and signer fingerprint. Do not edit or reorder existing entries.

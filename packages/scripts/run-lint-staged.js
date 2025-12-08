@@ -5,11 +5,11 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const projectRoot = process.env.INIT_CWD || process.cwd();
-const configPath = path.join(__dirname, "..", "lint-staged.config.js");
+const configPath = require.resolve("@sonarmd/lint-staged-config");
 
 const binCandidates = [
   path.join(projectRoot, "node_modules", ".bin", "lint-staged"),
-  path.join(__dirname, "..", "node_modules", ".bin", "lint-staged"),
+  path.join(__dirname, "node_modules", ".bin", "lint-staged"),
 ];
 
 const bin = binCandidates.find(fs.existsSync);
@@ -17,7 +17,7 @@ const bin = binCandidates.find(fs.existsSync);
 if (!bin) {
   // eslint-disable-next-line no-console
   console.error(
-    "lint-staged is not installed. Run `yarn star-config` to install the toolchain.",
+    "lint-staged is not installed. Install it in your project (e.g. `yarn add -D lint-staged`).",
   );
   process.exit(1);
 }

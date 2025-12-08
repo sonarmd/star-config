@@ -27,7 +27,7 @@ if (hookContents.includes(command)) {
 }
 
 const needsTrailingNewline = hookContents.length > 0 && !hookContents.endsWith("\n");
-const marker = "# Added by @sonarmd/star-config";
+const marker = "# Added by @sonarmd/scripts";
 
 try {
   fs.appendFileSync(

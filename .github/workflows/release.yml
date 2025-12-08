@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*.*_rc"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve commit SHA
+        id: resolve
+        run: |
+          commit=$(git rev-parse "$GITHUB_REF^{commit}")
+          echo "commit_sha=$commit" >> "$GITHUB_OUTPUT"
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Yarn version
+        run: yarn --version
+
+      - name: Pack workspaces and checksums
+        run: node scripts/pack-and-checksum.js
+
+      - name: Generate release notes
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ steps.resolve.outputs.commit_sha }}
+          PACKAGES_FILE: dist/pack-output.json
+          CHECKSUMS_FILE: dist/checksums.txt
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/generate-release-notes.js
+
+      - name: Import GPG key (optional signing)
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        uses: crazy-max/ghaction-import-gpg@v5
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Sign checksum (optional)
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        run: gpg --batch --yes --armor --detach-sign --output dist/checksums.txt.asc dist/checksums.txt
+
+      - name: Collect assets
+        id: assets
+        run: |
+          files=$(paste -sd' ' dist/assets.txt)
+          if [ -f dist/checksums.txt.asc ]; then
+            files="$files dist/checksums.txt.asc"
+          fi
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          prerelease=false
+          if echo "$TAG_NAME" | grep -qi "_rc$"; then
+            prerelease=true
+          fi
+          gh release create "$TAG_NAME" $(echo "${{ steps.assets.outputs.files }}") \
+            --title "Release $TAG_NAME" \
+            --notes-file release-notes.md \
+            --prerelease=$prerelease

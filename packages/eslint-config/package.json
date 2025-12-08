@@ -1,0 +1,19 @@
+{
+  "name": "@sonarmd/eslint-config",
+  "version": "1.0.0",
+  "description": "ESLint shareable config for SonarMD projects.",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./legacy": "./legacy.js"
+  },
+  "files": [
+    "index.js",
+    "legacy.js"
+  ],
+  "author": "SonarMD",
+  "license": "UNLICENSED",
+  "peerDependencies": {
+    "eslint": "^9.0.0 || ^8.57.0"
+  }
+}

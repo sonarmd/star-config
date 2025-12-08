@@ -1,75 +1,68 @@
-## @sonarmd/star-config
+## @sonarmd/star-config (monorepo)
 
-Namespaced, zero-config toolchain for SonarMD projects (ESLint, Prettier, lint-staged, git hooks, TS config, and helper scripts).
+Yarn-only toolkit with individually installable packages and a meta package that pulls in the full suite.
+
+Packages:
+- `@sonarmd/eslint-config` (modern + legacy)
+- `@sonarmd/prettier-config`
+- `@sonarmd/lint-staged-config`
+- `@sonarmd/githooks-config` (targets `@sonarmd/scripts/run-lint-staged.js`)
+- `@sonarmd/tsconfig`
+- `@sonarmd/scripts` (run-lint-staged, add-precommit-hook)
+- `@sonarmd/star-config` (meta; depends on all of the above)
 
 ### Install
 
-```bash
-npm install --save-dev @sonarmd/star-config eslint prettier lint-staged husky typescript
-```
+- Full suite (installs all components via dependencies):
+  ```bash
+  yarn add -D @sonarmd/star-config
+  ```
+- Individual packages (pick what you need):
+  ```bash
+  yarn add -D @sonarmd/eslint-config @sonarmd/prettier-config @sonarmd/lint-staged-config @sonarmd/githooks-config @sonarmd/tsconfig @sonarmd/scripts
+  ```
+- Required peer deps (project-level):
+  ```bash
+  yarn add -D eslint prettier lint-staged typescript husky
+  ```
 
-### ESLint
+### Usage
 
-Modern ruleset:
+- ESLint (modern):
+  ```json
+  { "extends": ["@sonarmd/eslint-config"] }
+  ```
+- ESLint (legacy):
+  ```json
+  { "extends": ["@sonarmd/eslint-config/legacy"] }
+  ```
+- Prettier:
+  ```json
+  { "prettier": "@sonarmd/prettier-config" }
+  ```
+- lint-staged:
+  ```json
+  { "lint-staged": "@sonarmd/lint-staged-config" }
+  ```
+- Git hooks (simple-git-hooks or raw hook):
+  ```json
+  { "githooks": "@sonarmd/githooks-config" }
+  ```
+  or reference directly in `.git/hooks/pre-commit`:
+  ```bash
+  node node_modules/@sonarmd/scripts/run-lint-staged.js
+  ```
+- TypeScript:
+  ```json
+  { "extends": "@sonarmd/tsconfig/tsconfig.json" }
+  ```
+- Scripts:
+  - `node node_modules/@sonarmd/scripts/run-lint-staged.js`
+  - `node node_modules/@sonarmd/scripts/add-precommit-hook.js`
 
-```json
-{
-  "extends": ["@sonarmd/star-config"]
-}
-```
+### Release flow & integrity
 
-Legacy ruleset:
-
-```json
-{
-  "extends": ["@sonarmd/star-config/eslint/legacy"]
-}
-```
-
-### Prettier
-
-```json
-{
-  "prettier": "@sonarmd/star-config/prettier"
-}
-```
-
-### lint-staged
-
-```json
-{
-  "lint-staged": "@sonarmd/star-config/lint-staged"
-}
-```
-
-### Git hooks
-
-Use the provided hook command to run lint-staged (works with simple-git-hooks or a raw pre-commit hook):
-
-```json
-{
-  "githooks": "@sonarmd/star-config/githooks"
-}
-```
-
-or directly:
-
-```bash
-node node_modules/@sonarmd/star-config/scripts/run-lint-staged.js
-```
-
-### TypeScript
-
-```json
-{
-  "extends": "@sonarmd/star-config/tsconfig"
-}
-```
-
-### Release integrity
-
-- Workflow `.github/workflows/pack-hash-sign.yml` runs on every push to pack the module and emit a `checksums.txt` (SHA-256) alongside the tarball artifact.
-- If repo secrets `GPG_PRIVATE_KEY` (ASCII-armored) and `GPG_PASSPHRASE` are set, the workflow also creates `checksums.txt.asc` as an ASCII-armored detached signature.
-- Verification steps: import the public key, run `gpg --verify checksums.txt.asc checksums.txt`, then run `shasum -a 256 <tarball>` and compare with the recorded checksum.
-- Workflow `.github/workflows/integrity-log.yml` appends an entry to `integrity-log.md` on each push (skips when `[skip ci]` is in the commit message) capturing the commit SHA, ref, packed tarball name, SHA-256 checksum, declared `GPG_KEY_ID`, and SSH public keys.
-- Set repo secrets: `SSH_PUBLIC_KEYS` (newline-separated keys you trust) and optionally `GPG_KEY_ID` (to record which key signs releases). The log is append-only; do not edit existing entries.
+- Tags drive releases: `v*.*.*_rc` (release candidates) and `v*.*.*` (GA) trigger `.github/workflows/release.yml`.
+- The release workflow uses Yarn to pack every workspace, computes SHA-256 for each tarball, optionally signs `checksums.txt` when `GPG_PRIVATE_KEY`/`GPG_PASSPHRASE` secrets are present, and publishes a GitHub release (prerelease for RCs) with all tarballs plus checksums.
+- Release notes include: commit SHA, commit signature fingerprint/algorithm/state (SSH-signed commits are required), per-package tarball name/checksum, and full dependency version lists for every package.
+- `integrity-log.md` stays append-only and should be updated manually (e.g., pre-commit) with commit hash, checksum, and signer fingerprint; never rewrite existing entries.

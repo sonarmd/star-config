@@ -1,0 +1,48 @@
+{
+  "name": "@sonarmd/star-config",
+  "version": "1.0.0",
+  "description": "Meta package that installs the full SonarMD tooling suite (ESLint, Prettier, lint-staged, git hooks, TS config, scripts).",
+  "main": "eslint.js",
+  "exports": {
+    ".": "./eslint.js",
+    "./eslint": "./eslint.js",
+    "./eslint/legacy": "./eslint-legacy.js",
+    "./prettier": "./prettier.config.cjs",
+    "./lint-staged": "./lint-staged.config.js",
+    "./githooks": "./githooks.config.js",
+    "./tsconfig": "./tsconfig.json"
+  },
+  "files": [
+    "eslint.js",
+    "eslint-legacy.js",
+    "prettier.config.cjs",
+    "lint-staged.config.js",
+    "githooks.config.js",
+    "tsconfig.json"
+  ],
+  "author": "SonarMD",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@sonarmd/eslint-config": "1.0.0",
+    "@sonarmd/prettier-config": "1.0.0",
+    "@sonarmd/lint-staged-config": "1.0.0",
+    "@sonarmd/githooks-config": "1.0.0",
+    "@sonarmd/tsconfig": "1.0.0",
+    "@sonarmd/scripts": "1.0.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0 || ^8.57.0",
+    "prettier": "^3.3.0",
+    "lint-staged": "^15.0.0",
+    "typescript": ">=4.9.0",
+    "husky": "^9.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    },
+    "husky": {
+      "optional": true
+    }
+  }
+}
