@@ -1,0 +1,22 @@
+{
+  "name": "eslint-config-sonarmd",
+  "version": "1.0.0",
+  "description": "Alias wrapper for @sonarmd/eslint-config.",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./legacy": "./legacy.js"
+  },
+  "files": [
+    "index.js",
+    "legacy.js"
+  ],
+  "author": "SonarMD",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@sonarmd/eslint-config": "1.0.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0 || ^8.57.0"
+  }
+}

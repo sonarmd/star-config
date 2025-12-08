@@ -1,0 +1,20 @@
+{
+  "name": "prettier-config-sonarmd",
+  "version": "1.0.0",
+  "description": "Alias wrapper for @sonarmd/prettier-config.",
+  "main": "prettier.config.cjs",
+  "exports": {
+    ".": "./prettier.config.cjs"
+  },
+  "files": [
+    "prettier.config.cjs"
+  ],
+  "author": "SonarMD",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@sonarmd/prettier-config": "1.0.0"
+  },
+  "peerDependencies": {
+    "prettier": "^3.3.0"
+  }
+}

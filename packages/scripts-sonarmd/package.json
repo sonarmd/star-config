@@ -1,0 +1,27 @@
+{
+  "name": "scripts-sonarmd",
+  "version": "1.0.0",
+  "description": "Alias wrapper for @sonarmd/scripts.",
+  "main": "run-lint-staged.js",
+  "exports": {
+    ".": "./run-lint-staged.js",
+    "./run-lint-staged": "./run-lint-staged.js",
+    "./add-precommit-hook": "./add-precommit-hook.js"
+  },
+  "files": [
+    "run-lint-staged.js",
+    "add-precommit-hook.js"
+  ],
+  "bin": {
+    "sonarmd-run-lint-staged": "./run-lint-staged.js",
+    "sonarmd-add-precommit-hook": "./add-precommit-hook.js"
+  },
+  "author": "SonarMD",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@sonarmd/scripts": "1.0.0"
+  },
+  "peerDependencies": {
+    "lint-staged": "^15.0.0"
+  }
+}
