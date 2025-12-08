@@ -50,7 +50,7 @@ jobs:
       - name: Load GPG Key from 1Password
         if: ${{ env.OP_SERVICE_ACCOUNT_TOKEN != '' }}
         env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ env.OP_SERVICE_ACCOUNT_TOKEN }}
           OP_VAULT: SharedVault
           OP_GPG_ITEM: GPG-Signing-Key
         run: |
