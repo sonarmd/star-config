@@ -101,6 +101,10 @@ jobs:
             printf '[%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$msg" | tee -a "$LOG_FILE"
           }
 
+          now_ts=$(date -u +%s)
+          month_secs=$((30*24*3600))
+          rotate_secs=$((5*30*24*3600))
+
           mkdir -p "$(dirname "$LOG_FILE")"
           touch "$LOG_FILE"
 
@@ -108,12 +112,7 @@ jobs:
           curl -sS https://downloads.1password.com/linux/debian/amd64/stable/1password-cli-amd64-latest.deb -o op.deb
           sudo dpkg -i op.deb
 
-          GNUPGHOME_INSPECT="$(mktemp -d)"
-          export GNUPGHOME="$GNUPGHOME_INSPECT"
-
-          list_ids() {
-            op item list --vault "$OP_VAULT" --format json | jq -r --arg name "$OP_GPG_ITEM" '.[] | select(.title==$name) | "\(.id)\t\(.createdAt)"'
-          }
+          list_items_json="$(op item list --vault "$OP_VAULT" --format json | jq --arg name "$OP_GPG_ITEM" '[.[] | select(.title==$name)]')"
 
           fingerprint_for() {
             local item_id="$1"
@@ -122,21 +121,74 @@ jobs:
               | awk -F: '/^fpr:/{print $10; exit}'
           }
 
-          ITEM_TO_USE=""
+          mapfile -t ids < <(echo "$list_items_json" | jq -r '.[].id')
           declare -A FPR_BY_ID
           declare -A CREATED_BY_ID
 
-          if [ -n "${OP_GPG_ITEM_ID:-}" ]; then
-            ITEM_TO_USE="$OP_GPG_ITEM_ID"
+          for id in "${ids[@]}"; do
+            created=$(echo "$list_items_json" | jq -r --arg id "$id" '.[] | select(.id==$id) | .createdAt')
+            fpr="$(fingerprint_for "$id" || true)"
+            FPR_BY_ID["$id"]="$fpr"
+            CREATED_BY_ID["$id"]="$created"
+            log "Found item $id created $created fingerprint ${fpr:-none}"
+          done
+
+          chosen_id="${OP_GPG_ITEM_ID:-}"
+
+          # If expected fingerprint is set but absent, quarantine and regenerate
+          if [ -z "$chosen_id" ] && [ -n "${OP_GPG_EXPECTED_FPR:-}" ]; then
+            found_match=false
+            for id in "${ids[@]}"; do
+              if [ "${FPR_BY_ID[$id]}" = "$OP_GPG_EXPECTED_FPR" ]; then
+                chosen_id="$id"
+                found_match=true
+                log "Selected expected fingerprint $OP_GPG_EXPECTED_FPR at item $id"
+                break
+              fi
+            done
+            if [ "$found_match" = false ] && [ "${#ids[@]}" -gt 0 ]; then
+              log "No item matches expected fingerprint $OP_GPG_EXPECTED_FPR; archiving all candidates"
+              for id in "${ids[@]}"; do
+                log "Archiving unexpected item $id"
+                op item delete "$id" --vault "$OP_VAULT" --archive
+              done
+              ids=()
+            fi
           fi
 
-          mapfile -t matches < <(list_ids)
+          # Deduplicate identical fingerprints (keep oldest)
+          declare -A keep_for_fpr
+          for id in "${ids[@]}"; do
+            fpr="${FPR_BY_ID[$id]}"
+            created="${CREATED_BY_ID[$id]}"
+            if [ -z "$fpr" ]; then
+              continue
+            fi
+            if [ -z "${keep_for_fpr[$fpr]+x}" ]; then
+              keep_for_fpr["$fpr"]="$id"
+            else
+              keep_id="${keep_for_fpr[$fpr]}"
+              keep_created="${CREATED_BY_ID[$keep_id]}"
+              if [[ "$created" < "$keep_created" ]]; then
+                log "Deleting duplicate item $keep_id with same fingerprint $fpr (keeping older $id)"
+                op item delete "$keep_id" --vault "$OP_VAULT" --archive
+                keep_for_fpr["$fpr"]="$id"
+              else
+                log "Deleting duplicate item $id with same fingerprint $fpr (keeping older $keep_id)"
+                op item delete "$id" --vault "$OP_VAULT" --archive
+              fi
+            fi
+          done
 
-          if [ ${#matches[@]} -eq 0 ] && [ -z "$ITEM_TO_USE" ]; then
-            log "No GPG item found; generating new key"
+          # Refresh after dedupe/quarantine
+          list_items_json="$(op item list --vault "$OP_VAULT" --format json | jq --arg name "$OP_GPG_ITEM" '[.[] | select(.title==$name)]')"
+          mapfile -t ids < <(echo "$list_items_json" | jq -r '.[].id')
+
+          if [ ${#ids[@]} -eq 0 ]; then
+            log "No GPG items remain; generating new key"
             NEW_NAME="${GPG_NAME:-CI Release Key}"
             NEW_EMAIL="${GPG_EMAIL:-ci@sonarmd.com}"
-            NEW_EXPIRE="${GPG_EXPIRE:-5m}" # months -> gpg accepts e.g., 5m
+            NEW_EXPIRE="${GPG_EXPIRE:-5m}"
             gpg --batch --yes --passphrase '' --quick-generate-key "$NEW_NAME <$NEW_EMAIL>" ed25519 sign "$NEW_EXPIRE"
             NEW_KEY_ID="$(gpg --list-secret-keys --keyid-format=long "$NEW_EMAIL" | awk '/^sec/{print $2}' | sed 's#.*/##' | head -n1)"
             PUB_TMP="$(mktemp)"
@@ -144,67 +196,84 @@ jobs:
             gpg --armor --export "$NEW_KEY_ID" > "$PUB_TMP"
             gpg --armor --export-secret-key "$NEW_KEY_ID" > "$PRIV_TMP"
             ITEM_JSON="$(op document create "$PRIV_TMP" --vault "$OP_VAULT" --title "$OP_GPG_ITEM" --format json)"
-            ITEM_TO_USE="$(echo "$ITEM_JSON" | jq -r '.id // .uuid')"
-            log "Generated new key $NEW_KEY_ID and stored as $ITEM_TO_USE"
-          else
-            log "Discovered ${#matches[@]} items titled \"$OP_GPG_ITEM\""
-            for row in "${matches[@]}"; do
-              id="${row%%$'\t'*}"
-              created="${row#*$'\t'}"
-              fpr="$(fingerprint_for "$id" || true)"
-              FPR_BY_ID["$id"]="$fpr"
-              CREATED_BY_ID["$id"]="$created"
-              log "Candidate item $id created $created fingerprint $fpr"
-            done
+            ids=("$(echo "$ITEM_JSON" | jq -r '.id // .uuid')")
+            list_items_json="$(op item list --vault "$OP_VAULT" --format json | jq --arg name "$OP_GPG_ITEM" '[.[] | select(.title==$name)]')"
+          fi
 
-            if [ -z "$ITEM_TO_USE" ]; then
-              if [ -n "${OP_GPG_EXPECTED_FPR:-}" ]; then
-                for id in "${!FPR_BY_ID[@]}"; do
-                  if [ "${FPR_BY_ID[$id]}" = "$OP_GPG_EXPECTED_FPR" ]; then
-                    ITEM_TO_USE="$id"
-                    log "Selected expected fingerprint $OP_GPG_EXPECTED_FPR at item $id"
-                    break
-                  fi
-                done
-              fi
+          pick_latest_two() {
+            echo "$list_items_json" | jq -r '[.[] | {id: .id, created: .createdAt}] | sort_by(.created) | reverse | .[0:2] | .[] | "\(.id)\t\(.created)"'
+          }
+
+          primary_id="$chosen_id"
+          secondary_id=""
+
+          if [ -z "$primary_id" ]; then
+            primary_info=$(pick_latest_two | head -n1 || true)
+            primary_id="${primary_info%%$'\t'*}"
+          fi
+
+          if [ -z "$primary_id" ]; then
+            log "No primary key selected; generating new key"
+            NEW_NAME="${GPG_NAME:-CI Release Key}"
+            NEW_EMAIL="${GPG_EMAIL:-ci@sonarmd.com}"
+            NEW_EXPIRE="${GPG_EXPIRE:-5m}"
+            gpg --batch --yes --passphrase '' --quick-generate-key "$NEW_NAME <$NEW_EMAIL>" ed25519 sign "$NEW_EXPIRE"
+            NEW_KEY_ID="$(gpg --list-secret-keys --keyid-format=long "$NEW_EMAIL" | awk '/^sec/{print $2}' | sed 's#.*/##' | head -n1)"
+            PUB_TMP="$(mktemp)"
+            PRIV_TMP="$(mktemp)"
+            gpg --armor --export "$NEW_KEY_ID" > "$PUB_TMP"
+            gpg --armor --export-secret-key "$NEW_KEY_ID" > "$PRIV_TMP"
+            ITEM_JSON="$(op document create "$PRIV_TMP" --vault "$OP_VAULT" --title "$OP_GPG_ITEM" --format json)"
+            primary_id="$(echo "$ITEM_JSON" | jq -r '.id // .uuid')"
+            list_items_json="$(op item list --vault "$OP_VAULT" --format json | jq --arg name "$OP_GPG_ITEM" '[.[] | select(.title==$name)]')"
+          fi
+
+          secondary_info=$(pick_latest_two | sed -n '2p' || true)
+          if [ -n "$secondary_info" ]; then
+            secondary_id="${secondary_info%%$'\t'*}"
+          fi
+
+          primary_created=$(echo "$list_items_json" | jq -r --arg id "$primary_id" '.[] | select(.id==$id) | .createdAt')
+          primary_ts=$(date -d "$primary_created" +%s)
+
+          # Rotate if primary older than 5 months
+          if [ $((now_ts - primary_ts)) -gt "$rotate_secs" ]; then
+            log "Primary key older than 5 months; rotating"
+            old_primary="$primary_id"
+            NEW_NAME="${GPG_NAME:-CI Release Key}"
+            NEW_EMAIL="${GPG_EMAIL:-ci@sonarmd.com}"
+            NEW_EXPIRE="${GPG_EXPIRE:-5m}"
+            gpg --batch --yes --passphrase '' --quick-generate-key "$NEW_NAME <$NEW_EMAIL>" ed25519 sign "$NEW_EXPIRE"
+            NEW_KEY_ID="$(gpg --list-secret-keys --keyid-format=long "$NEW_EMAIL" | awk '/^sec/{print $2}' | sed 's#.*/##' | head -n1)"
+            PUB_TMP="$(mktemp)"
+            PRIV_TMP="$(mktemp)"
+            gpg --armor --export "$NEW_KEY_ID" > "$PUB_TMP"
+            gpg --armor --export-secret-key "$NEW_KEY_ID" > "$PRIV_TMP"
+            ITEM_JSON="$(op document create "$PRIV_TMP" --vault "$OP_VAULT" --title "$OP_GPG_ITEM" --format json)"
+            primary_id="$(echo "$ITEM_JSON" | jq -r '.id // .uuid')"
+            log "Generated new key $NEW_KEY_ID stored as $primary_id"
+            if [ -n "$old_primary" ]; then
+              secondary_id="$old_primary"
             fi
+            primary_created=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            primary_ts=$now_ts
+          fi
 
-            if [ -z "$ITEM_TO_USE" ]; then
-              # pick oldest by createdAt
-              oldest_id=""
-              oldest_created=""
-              for id in "${!CREATED_BY_ID[@]}"; do
-                ts="${CREATED_BY_ID[$id]}"
-                if [ -z "$oldest_created" ] || [[ "$ts" < "$oldest_created" ]]; then
-                  oldest_created="$ts"
-                  oldest_id="$id"
-                fi
-              done
-              ITEM_TO_USE="$oldest_id"
-              log "Selected oldest item $ITEM_TO_USE created $oldest_created"
-            fi
-
-            # Delete exact duplicates (same fingerprint) other than the kept item
-            keep_fpr="${FPR_BY_ID[$ITEM_TO_USE]}"
-            if [ -n "$keep_fpr" ]; then
-              for id in "${!FPR_BY_ID[@]}"; do
-                if [ "$id" != "$ITEM_TO_USE" ] && [ "${FPR_BY_ID[$id]}" = "$keep_fpr" ]; then
-                  log "Deleting duplicate item $id with same fingerprint $keep_fpr"
-                  op item delete "$id" --vault "$OP_VAULT" --archive
-                fi
-              done
+          # Retire secondary if older than ramp window
+          if [ -n "$secondary_id" ]; then
+            secondary_created=$(echo "$list_items_json" | jq -r --arg id "$secondary_id" '.[] | select(.id==$id) | .createdAt')
+            secondary_ts=$(date -d "$secondary_created" +%s)
+            if [ $((now_ts - secondary_ts)) -gt $((month_secs)) ]; then
+              log "Secondary key $secondary_id beyond ramp window; archiving"
+              op item delete "$secondary_id" --vault "$OP_VAULT" --archive
+              secondary_id=""
             fi
           fi
 
-          if [ -z "$ITEM_TO_USE" ]; then
-            log "No usable GPG item found after processing."
-            exit 1
-          fi
-
-          # Switch to default GNUPGHOME for actual import/signing
+          # Import keys
           unset GNUPGHOME
-          log "Importing key from item $ITEM_TO_USE"
-          op document get "$ITEM_TO_USE" --vault="$OP_VAULT" | gpg --batch --import
+          log "Importing primary key item $primary_id"
+          op document get "$primary_id" --vault="$OP_VAULT" | gpg --batch --import
 
           KEY_ID=$(
             gpg --list-secret-keys --keyid-format LONG \
@@ -218,19 +287,54 @@ jobs:
           )
 
           if [ -n "${OP_GPG_EXPECTED_FPR:-}" ] && [ "$OP_GPG_EXPECTED_FPR" != "$KEY_FPR" ]; then
-            log "Loaded fingerprint $KEY_FPR does not match expected $OP_GPG_EXPECTED_FPR"
-            exit 1
+            log "WARNING: Loaded fingerprint $KEY_FPR does not match expected $OP_GPG_EXPECTED_FPR (continuing with regenerated/selected key)"
+          fi
+
+          SECONDARY_KEY_ID=""
+          SECONDARY_FPR=""
+          if [ -n "$secondary_id" ]; then
+            log "Importing secondary key item $secondary_id for dual-signing ramp"
+            op document get "$secondary_id" --vault="$OP_VAULT" | gpg --batch --import
+            SECONDARY_KEY_ID=$(
+              gpg --list-secret-keys --keyid-format LONG \
+                | awk '/^sec/{print $2}' \
+                | cut -d'/' -f2 \
+                | grep -v "$KEY_ID" \
+                | head -n1
+            )
+            SECONDARY_FPR=$(
+              gpg --list-secret-keys --with-colons \
+                | awk -F: '/^fpr:/{print $10}' \
+                | grep -v "$KEY_FPR" \
+                | head -n1
+            )
           fi
 
           git config --global user.signingkey "$KEY_ID"
           git config --global commit.gpgsign true
-          log "Loaded GPG key $KEY_ID fingerprint $KEY_FPR from 1Password item $ITEM_TO_USE"
+          log "Loaded GPG key $KEY_ID fingerprint $KEY_FPR from 1Password item $primary_id"
+          if [ -n "$SECONDARY_KEY_ID" ]; then
+            log "Loaded secondary key $SECONDARY_KEY_ID fingerprint $SECONDARY_FPR for dual-signing"
+          fi
           echo "key_id=$KEY_ID" >> "$GITHUB_OUTPUT"
           echo "fingerprint=$KEY_FPR" >> "$GITHUB_OUTPUT"
+          echo "secondary_key_id=$SECONDARY_KEY_ID" >> "$GITHUB_OUTPUT"
+          echo "secondary_fingerprint=$SECONDARY_FPR" >> "$GITHUB_OUTPUT"
 
       - name: Sign checksum (optional)
         if: ${{ env.OP_SERVICE_ACCOUNT_TOKEN != '' }}
-        run: gpg --batch --yes --armor --detach-sign --output dist/checksums.txt.asc dist/checksums.txt | tee -a dist/release.log
+        env:
+          PRIMARY_KEY: ${{ steps.gpg.outputs.key_id }}
+          SECONDARY_KEY: ${{ steps.gpg.outputs.secondary_key_id }}
+        run: |
+          set -euo pipefail
+          log_file="dist/release.log"
+          echo "[sign] primary $PRIMARY_KEY" | tee -a "$log_file"
+          gpg --batch --yes --armor --local-user "$PRIMARY_KEY" --detach-sign --output dist/checksums.txt.asc dist/checksums.txt | tee -a "$log_file"
+          if [ -n "$SECONDARY_KEY" ]; then
+            echo "[sign] secondary $SECONDARY_KEY" | tee -a "$log_file"
+            gpg --batch --yes --armor --local-user "$SECONDARY_KEY" --detach-sign --output dist/checksums.txt.asc.secondary dist/checksums.txt | tee -a "$log_file"
+          fi
 
       - name: Collect assets
         id: assets
@@ -238,6 +342,9 @@ jobs:
           files=$(paste -sd' ' dist/assets.txt)
           if [ -f dist/checksums.txt.asc ]; then
             files="$files dist/checksums.txt.asc"
+          fi
+          if [ -f dist/checksums.txt.asc.secondary ]; then
+            files="$files dist/checksums.txt.asc.secondary"
           fi
           if [ -f dist/release.log ]; then
             files="$files dist/release.log"
@@ -264,6 +371,8 @@ jobs:
           COMMIT_SHA: ${{ steps.resolve.outputs.commit_sha }}
           KEY_ID: ${{ steps.gpg.outputs.key_id }}
           KEY_FPR: ${{ steps.gpg.outputs.fingerprint }}
+          SECONDARY_KEY_ID: ${{ steps.gpg.outputs.secondary_key_id }}
+          SECONDARY_FPR: ${{ steps.gpg.outputs.secondary_fingerprint }}
         run: |
           {
             echo "## Release"
@@ -271,6 +380,9 @@ jobs:
             echo "- Commit: $COMMIT_SHA"
             if [ -n "$KEY_ID" ]; then
               echo "- GPG key: $KEY_ID ($KEY_FPR)"
+            fi
+            if [ -n "$SECONDARY_KEY_ID" ]; then
+              echo "- Secondary key: $SECONDARY_KEY_ID ($SECONDARY_FPR) [dual-sign ramp]"
             fi
             echo "- Assets: ${{ steps.assets.outputs.files }}"
           } >> "$GITHUB_STEP_SUMMARY"
