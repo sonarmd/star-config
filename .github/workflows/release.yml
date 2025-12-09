@@ -255,6 +255,8 @@ jobs:
             if [ -n "$old_primary" ]; then
               secondary_id="$old_primary"
             fi
+            # refresh metadata to include new primary
+            list_items_json="$(op item list --vault "$OP_VAULT" --format json | jq --arg name "$OP_GPG_ITEM" '[.[] | select(.title==$name)]')"
             primary_created=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
             primary_ts=$now_ts
           fi
@@ -287,7 +289,38 @@ jobs:
           )
 
           if [ -n "${OP_GPG_EXPECTED_FPR:-}" ] && [ "$OP_GPG_EXPECTED_FPR" != "$KEY_FPR" ]; then
-            log "WARNING: Loaded fingerprint $KEY_FPR does not match expected $OP_GPG_EXPECTED_FPR (continuing with regenerated/selected key)"
+            log "Loaded fingerprint $KEY_FPR does not match expected $OP_GPG_EXPECTED_FPR; quarantining and regenerating"
+            # archive current items
+            for id in "${ids[@]}"; do
+              log "Archiving item $id due to fingerprint mismatch"
+              op item delete "$id" --vault "$OP_VAULT" --archive
+            done
+            # generate replacement
+            NEW_NAME="${GPG_NAME:-CI Release Key}"
+            NEW_EMAIL="${GPG_EMAIL:-ci@sonarmd.com}"
+            NEW_EXPIRE="${GPG_EXPIRE:-5m}"
+            gpg --batch --yes --passphrase '' --quick-generate-key "$NEW_NAME <$NEW_EMAIL>" ed25519 sign "$NEW_EXPIRE"
+            NEW_KEY_ID="$(gpg --list-secret-keys --keyid-format=long "$NEW_EMAIL" | awk '/^sec/{print $2}' | sed 's#.*/##' | head -n1)"
+            PUB_TMP="$(mktemp)"
+            PRIV_TMP="$(mktemp)"
+            gpg --armor --export "$NEW_KEY_ID" > "$PUB_TMP"
+            gpg --armor --export-secret-key "$NEW_KEY_ID" > "$PRIV_TMP"
+            ITEM_JSON="$(op document create "$PRIV_TMP" --vault "$OP_VAULT" --title "$OP_GPG_ITEM" --format json)"
+            primary_id="$(echo "$ITEM_JSON" | jq -r '.id // .uuid')"
+            log "Generated new key $NEW_KEY_ID stored as $primary_id after mismatch"
+            # re-import new primary
+            op document get "$primary_id" --vault="$OP_VAULT" | gpg --batch --import
+            KEY_ID=$(
+              gpg --list-secret-keys --keyid-format LONG \
+                | awk '/^sec/{print $2}' \
+                | cut -d'/' -f2 \
+                | head -n1
+            )
+            KEY_FPR=$(
+              gpg --list-secret-keys --with-colons \
+                | awk -F: '/^fpr:/{print $10; exit}'
+            )
+            secondary_id=""
           fi
 
           SECONDARY_KEY_ID=""
@@ -336,6 +369,45 @@ jobs:
             gpg --batch --yes --armor --local-user "$SECONDARY_KEY" --detach-sign --output dist/checksums.txt.asc.secondary dist/checksums.txt | tee -a "$log_file"
           fi
 
+      - name: Write audit record
+        env:
+          TAG_NAME: ${{ steps.tag.outputs.tag_name }}
+          COMMIT_SHA: ${{ steps.resolve.outputs.commit_sha }}
+          KEY_ID: ${{ steps.gpg.outputs.key_id }}
+          KEY_FPR: ${{ steps.gpg.outputs.fingerprint }}
+          SECONDARY_KEY_ID: ${{ steps.gpg.outputs.secondary_key_id }}
+          SECONDARY_FPR: ${{ steps.gpg.outputs.secondary_fingerprint }}
+          OP_VAULT: CI/CD
+          OP_GPG_ITEM: GPG-Signing-Key
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          node <<'NODE'
+          const fs = require("fs");
+          const env = process.env;
+          const audit = {
+            timestamp: new Date().toISOString(),
+            tag: env.TAG_NAME || "",
+            commit: env.COMMIT_SHA || "",
+            gpg: {
+              primary_key_id: env.KEY_ID || "",
+              primary_fingerprint: env.KEY_FPR || "",
+              secondary_key_id: env.SECONDARY_KEY_ID || "",
+              secondary_fingerprint: env.SECONDARY_FPR || ""
+            },
+            onepassword: {
+              vault: env.OP_VAULT || "",
+              item_title: env.OP_GPG_ITEM || ""
+            },
+            artifacts: {
+              release_log: "dist/release.log",
+              checksum_sig_primary: "dist/checksums.txt.asc",
+              checksum_sig_secondary: "dist/checksums.txt.asc.secondary"
+            }
+          };
+          fs.writeFileSync("dist/audit.json", JSON.stringify(audit, null, 2));
+          NODE
+
       - name: Collect assets
         id: assets
         run: |
@@ -345,6 +417,9 @@ jobs:
           fi
           if [ -f dist/checksums.txt.asc.secondary ]; then
             files="$files dist/checksums.txt.asc.secondary"
+          fi
+          if [ -f dist/audit.json ]; then
+            files="$files dist/audit.json"
           fi
           if [ -f dist/release.log ]; then
             files="$files dist/release.log"
