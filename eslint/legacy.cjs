@@ -42,26 +42,26 @@ module.exports = {
     'no-var': 'error',
 
     // --- Hygiene ---
-    'no-console': ['warn', {allow: ['warn', 'error']}],
+    'no-console': ['error', {allow: ['error', 'error']}],
     'no-debugger': 'error',
     'prefer-const': ['error', {destructuring: 'all'}],
 
     // --- TypeScript ---
     '@typescript-eslint/no-unused-vars': [
-      'warn',
+      'error',
       {argsIgnorePattern: '^_', varsIgnorePattern: '^_'},
     ],
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-member-accessibility': 'off',
-    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-empty-function': 'off',
-    '@typescript-eslint/ban-ts-comment': ['warn', {'ts-ignore': 'allow-with-description'}],
+    '@typescript-eslint/ban-ts-comment': ['error', {'ts-ignore': 'allow-with-description'}],
 
     // --- Imports ---
     'import/first': 'error',
     'import/no-duplicates': 'error',
     'import/order': [
-      'warn',
+      'error',
       {
         groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index', 'object', 'type'],
         alphabetize: {order: 'asc', caseInsensitive: true},

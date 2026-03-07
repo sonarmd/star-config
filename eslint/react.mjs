@@ -2,39 +2,44 @@
 // Optional — enable with starConfig({ react: true }).
 // Applied to .tsx and .jsx files.
 
-import reactPlugin from "eslint-plugin-react";
-import reactHooks from "eslint-plugin-react-hooks";
+import reactPlugin from 'eslint-plugin-react';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 /** @type {import("eslint").Linter.Config[]} */
 const config = [
   {
-    name: "star-config/react",
-    files: ["**/*.tsx", "**/*.jsx"],
+    name: 'star-config/react',
+    files: ['**/*.tsx', '**/*.jsx'],
     plugins: {
       react: reactPlugin,
-      "react-hooks": reactHooks,
+      'react-hooks': reactHooks,
     },
     settings: {
       react: {
-        version: "detect",
+        version: 'detect',
       },
     },
     rules: {
       // JSX transforms (React 17+) — no need for import React
-      "react/jsx-uses-react": "off",
-      "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off",
+      'react/jsx-uses-react': 'off',
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
 
       // Safety
-      "react/no-danger": "warn",
-      "react/no-unstable-nested-components": "warn",
-      "react/no-array-index-key": "warn",
-      "react/jsx-no-target-blank": ["error", {enforceDynamicLinks: "always"}],
-      "react/jsx-no-script-url": "error",
+      'react/no-danger': 'error',
+      'react/no-danger-with-children': 'error',
+      'react/no-unstable-nested-components': 'error',
+      'react/no-array-index-key': 'error',
+      'react/no-object-type-as-default-prop': 'error',
+      'react/jsx-no-target-blank': ['error', {enforceDynamicLinks: 'always'}],
+      'react/jsx-no-script-url': 'error',
+      'react/jsx-no-leaked-render': 'error',
+      'react/jsx-no-useless-fragment': 'error',
+      'react/self-closing-comp': 'error',
 
       // Hooks
-      "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'error',
     },
   },
 ];

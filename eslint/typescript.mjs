@@ -32,7 +32,7 @@ const config = [
 
       // TS equivalents
       '@typescript-eslint/no-unused-vars': [
-        'warn',
+        'error',
         {argsIgnorePattern: '^_', varsIgnorePattern: '^_'},
       ],
       '@typescript-eslint/no-shadow': ['error'],
@@ -42,11 +42,11 @@ const config = [
       ],
 
       // Type safety
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-non-null-assertion': 'warn',
-      '@typescript-eslint/ban-ts-comment': ['warn', {'ts-ignore': 'allow-with-description'}],
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      '@typescript-eslint/ban-ts-comment': ['error', {'ts-ignore': 'allow-with-description'}],
       '@typescript-eslint/consistent-type-imports': [
-        'warn',
+        'error',
         {prefer: 'type-imports', fixStyle: 'inline-type-imports'},
       ],
       // switch-exhaustiveness-check requires project: true (type-aware).
