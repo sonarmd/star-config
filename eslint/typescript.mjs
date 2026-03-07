@@ -49,7 +49,8 @@ const config = [
         "warn",
         {prefer: "type-imports", fixStyle: "inline-type-imports"},
       ],
-      "@typescript-eslint/switch-exhaustiveness-check": "error",
+      // switch-exhaustiveness-check requires project: true (type-aware).
+      // Consumers who enable type-aware linting can add it via overrides.
 
       // Function signatures
       "@typescript-eslint/explicit-function-return-type": "off",
