@@ -13,17 +13,17 @@ on:
   workflow_dispatch:
     inputs:
       release_channel:
-        description: "Release channel"
+        description: 'Release channel'
         required: true
-        default: "rc"
+        default: 'rc'
         type: choice
         options:
           - rc
           - ga
       bump_type:
-        description: "Version bump type"
+        description: 'Version bump type'
         required: false
-        default: "patch"
+        default: 'patch'
         type: choice
         options:
           - patch
@@ -44,146 +44,74 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR head
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642195f2ed94f21bf2f2e36 # v4.4.0
+        with:
+          node-version: '22'
+
       - name: Create RC tag
         id: rc
         env:
-          TAG_SUFFIX: _rc
           TARGET_SHA: ${{ github.event.pull_request.head.sha }}
           PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          node <<'NODE'
-          const { execSync } = require("child_process");
-          const fs = require("fs");
+          node --input-type=module <<'NODE'
+          import {
+            run, latestGaTag, latestRcTag, greaterVersion,
+            bumpVersion, detectBumpFromText, shouldSkip, tagAndPush,
+          } from "./scripts/version-utils.mjs";
 
           const env = process.env;
           const targetSha = env.TARGET_SHA;
           if (!targetSha) {
-            throw new Error("TARGET_SHA is required to create the tag");
-          }
-
-          function run(cmd) {
-            try {
-              return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] }).trim();
-            } catch (error) {
-              if (error.stdout) {
-                console.error(error.stdout.toString());
-              }
-              throw error;
-            }
-          }
-
-          function latestGaTag() {
-            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1");
-            return tag || "v0.0.0";
-          }
-
-          function latestRcTag() {
-            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
-            return tag;
-          }
-
-          function latestRcTag() {
-            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
-            return tag;
-          }
-
-          function latestRcBase() {
-            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
-            return tag ? tag.replace(/_rc$/, "") : "";
-          }
-
-          function versionTuple(v) {
-            return v.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
-          }
-
-          function greaterVersion(a, b) {
-            const ta = versionTuple(a);
-            const tb = versionTuple(b);
-            for (let i = 0; i < 3; i += 1) {
-              if (ta[i] > tb[i]) return a;
-              if (ta[i] < tb[i]) return b;
-            }
-            return a;
-          }
-
-          function bumpVersion(version, type) {
-            const parts = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
-            let [major, minor, patch] = parts;
-            if (type === "major") {
-              major += 1;
-              minor = 0;
-              patch = 0;
-            } else if (type === "minor") {
-              minor += 1;
-              patch = 0;
-            } else {
-              patch += 1;
-            }
-            return `${major}.${minor}.${patch}`;
+            throw new Error("TARGET_SHA is required");
           }
 
           const labels = (() => {
             try {
               return JSON.parse(env.PR_LABELS || "[]");
-            } catch (error) {
-              console.warn("Failed to parse PR labels, defaulting to empty list");
+            } catch {
               return [];
             }
           })();
-          const labelNames = labels.map((label) => (label.name || "").toLowerCase());
+          const labelNames = labels.map((l) => (l.name || "").toLowerCase());
 
           let bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
           const majorLabels = new Set(["semver:major", "release:major", "version:major", "major"]);
           const minorLabels = new Set(["semver:minor", "release:minor", "version:minor", "minor"]);
 
-          if (labelNames.some((name) => majorLabels.has(name))) {
+          if (labelNames.some((n) => majorLabels.has(n))) {
             bumpType = "major";
-          } else if (labelNames.some((name) => minorLabels.has(name))) {
+          } else if (labelNames.some((n) => minorLabels.has(n))) {
             bumpType = "minor";
           }
 
           const commitMessage = run("git log -1 --pretty=%B").toLowerCase();
           const prTitle = (env.PR_TITLE || "").toLowerCase();
-          const skipPattern = /\[skip\s+tag\]|\[skip\s+release\]/i;
 
-          if (skipPattern.test(commitMessage) || skipPattern.test(prTitle)) {
-            console.log("Skip directive found (commit or title); exiting without tagging.");
+          if (shouldSkip(commitMessage) || shouldSkip(prTitle)) {
+            console.log("Skip directive found; exiting without tagging.");
             process.exit(0);
           }
 
-          const majorHint = /\[major\]|#major|\bmajor\b/;
-          const minorHint = /\[minor\]|#minor|\bminor\b/;
-
-          if (majorHint.test(commitMessage) || majorHint.test(prTitle)) {
-            bumpType = "major";
-          } else if ((minorHint.test(commitMessage) || minorHint.test(prTitle)) && bumpType !== "major") {
-            bumpType = "minor";
-          }
+          bumpType = detectBumpFromText(commitMessage, bumpType);
+          bumpType = detectBumpFromText(prTitle, bumpType);
 
           const gaBase = latestGaTag();
-          const rcBase = latestRcBase() || gaBase;
+          const rcTag = latestRcTag();
+          const rcBase = rcTag ? rcTag.replace(/_rc$/, "") : gaBase;
           const baseTag = greaterVersion(gaBase, rcBase);
           const nextVersion = bumpVersion(baseTag, bumpType);
-          const suffix = env.TAG_SUFFIX || "";
-          const tagName = `v${nextVersion}${suffix}`;
+          const tagName = `v${nextVersion}_rc`;
 
-          const existing = run(`git tag -l '${tagName}'`);
-          if (existing) {
-            console.log(`Tag ${tagName} already exists; skipping.`);
-            process.exit(0);
-          }
-
-          run(`git tag ${tagName} ${targetSha}`);
-          run(`git push origin ${tagName}`);
-
-          fs.appendFileSync(env.GITHUB_OUTPUT, `tag=${tagName}\n`);
-          console.log(`Created ${tagName} from ${baseTag} using bump "${bumpType}" at ${targetSha}`);
+          tagAndPush(tagName, targetSha);
+          console.log(`Created ${tagName} from ${baseTag} (${bumpType}) at ${targetSha}`);
           NODE
 
       - name: Tag summary
@@ -205,7 +133,7 @@ jobs:
           curl -sS -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches" \
             -d "{\"ref\":\"main\",\"inputs\":{\"tag_name\":\"${TAG_NAME}\"}}"
 
   ga-tag:
@@ -214,61 +142,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642195f2ed94f21bf2f2e36 # v4.4.0
+        with:
+          node-version: '22'
 
       - name: Create GA tag
         id: ga
         env:
-          TAG_SUFFIX: ""
           TARGET_SHA: ${{ github.sha }}
         run: |
-          node <<'NODE'
-          const { execSync } = require("child_process");
-          const fs = require("fs");
+          node --input-type=module <<'NODE'
+          import {
+            run, latestGaTag, latestRcTag, bumpVersion,
+            detectBumpFromText, shouldSkip, tagAndPush,
+          } from "./scripts/version-utils.mjs";
 
           const env = process.env;
           const targetSha = env.TARGET_SHA;
           if (!targetSha) {
-            throw new Error("TARGET_SHA is required to create the tag");
+            throw new Error("TARGET_SHA is required");
           }
 
-          function run(cmd) {
-            try {
-              return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] }).trim();
-            } catch (error) {
-              if (error.stdout) {
-                console.error(error.stdout.toString());
-              }
-              throw error;
-            }
-          }
-
-          function latestGaTag() {
-            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1");
-            return tag || "v0.0.0";
-          }
-
-          function bumpVersion(version, type) {
-            const parts = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
-            let [major, minor, patch] = parts;
-            if (type === "major") {
-              major += 1;
-              minor = 0;
-              patch = 0;
-            } else if (type === "minor") {
-              minor += 1;
-              patch = 0;
-            } else {
-              patch += 1;
-            }
-            return `${major}.${minor}.${patch}`;
-          }
-
-          // Prefer promoting the latest RC (same version, without bump)
-          const latestRc = latestRcTag();
           let tagName = "";
+          let baseTag = "";
+          let bumpType = "";
+
+          // Prefer promoting the latest RC (strip _rc suffix)
+          const latestRc = latestRcTag();
           if (latestRc) {
             const base = latestRc.replace(/_rc$/, "");
             const existing = run(`git tag -l '${base}'`);
@@ -277,42 +182,25 @@ jobs:
               process.exit(0);
             }
             tagName = base;
+            baseTag = latestRc;
+            bumpType = "promote";
           } else {
-            let bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
+            bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
             const commitMessage = run("git log -1 --pretty=%B").toLowerCase();
-            const skipPattern = /\[skip\s+tag\]|\[skip\s+release\]/i;
 
-            if (skipPattern.test(commitMessage)) {
-              console.log("Skip directive found in commit message; exiting without tagging.");
+            if (shouldSkip(commitMessage)) {
+              console.log("Skip directive found; exiting without tagging.");
               process.exit(0);
             }
 
-            const majorHint = /\[major\]|#major|\bmajor\b/;
-            const minorHint = /\[minor\]|#minor|\bminor\b/;
-
-            if (majorHint.test(commitMessage)) {
-              bumpType = "major";
-            } else if (minorHint.test(commitMessage) && bumpType !== "major") {
-              bumpType = "minor";
-            }
-
-            const baseTag = latestGaTag();
+            bumpType = detectBumpFromText(commitMessage, bumpType);
+            baseTag = latestGaTag();
             const nextVersion = bumpVersion(baseTag, bumpType);
-            const suffix = env.TAG_SUFFIX || "";
-            tagName = `v${nextVersion}${suffix}`;
+            tagName = `v${nextVersion}`;
           }
 
-          const existing = run(`git tag -l '${tagName}'`);
-          if (existing) {
-            console.log(`Tag ${tagName} already exists; skipping.`);
-            process.exit(0);
-          }
-
-          run(`git tag ${tagName} ${targetSha}`);
-          run(`git push origin ${tagName}`);
-
-          fs.appendFileSync(env.GITHUB_OUTPUT, `tag=${tagName}\n`);
-          console.log(`Created ${tagName} from ${baseTag} using bump "${bumpType}" at ${targetSha}`);
+          tagAndPush(tagName, targetSha);
+          console.log(`Created ${tagName} from ${baseTag} (${bumpType}) at ${targetSha}`);
           NODE
 
       - name: Tag summary
@@ -334,7 +222,7 @@ jobs:
           curl -sS -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches" \
             -d "{\"ref\":\"main\",\"inputs\":{\"tag_name\":\"${TAG_NAME}\"}}"
 
   manual-tag:
@@ -343,10 +231,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
           ref: main
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642195f2ed94f21bf2f2e36 # v4.4.0
+        with:
+          node-version: '22'
 
       - name: Create manual tag
         id: manual
@@ -356,84 +249,41 @@ jobs:
         run: |
           TARGET_SHA=$(git rev-parse HEAD)
           export TARGET_SHA
-          node <<'NODE'
-          const { execSync } = require("child_process");
-          const fs = require("fs");
+          node --input-type=module <<'NODE'
+          import {
+            run, latestGaTag, latestRcTag, bumpVersion, tagAndPush,
+          } from "./scripts/version-utils.mjs";
 
           const env = process.env;
           const targetSha = env.TARGET_SHA;
           if (!targetSha) {
-            throw new Error("TARGET_SHA is required to create the tag");
-          }
-
-          function run(cmd) {
-            try {
-              return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] }).trim();
-            } catch (error) {
-              if (error.stdout) {
-                console.error(error.stdout.toString());
-              }
-              throw error;
-            }
-          }
-
-          function latestGaTag() {
-            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1");
-            return tag || "v0.0.0";
-          }
-
-          function latestRcTag() {
-            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
-            return tag;
-          }
-
-          function bumpVersion(version, type) {
-            const parts = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
-            let [major, minor, patch] = parts;
-            if (type === "major") {
-              major += 1;
-              minor = 0;
-              patch = 0;
-            } else if (type === "minor") {
-              minor += 1;
-              patch = 0;
-            } else {
-              patch += 1;
-            }
-            return `${major}.${minor}.${patch}`;
+            throw new Error("TARGET_SHA is required");
           }
 
           let tagName = "";
+          let baseTag = "";
+          let bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
           const channel = (env.RELEASE_CHANNEL || "rc").toLowerCase();
 
           if (channel === "ga") {
             const rc = latestRcTag();
             if (rc) {
               tagName = rc.replace(/_rc$/, "");
+              baseTag = rc;
+              bumpType = "promote";
             } else {
-              const baseTag = latestGaTag();
-              const bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
+              baseTag = latestGaTag();
               const nextVersion = bumpVersion(baseTag, bumpType);
               tagName = `v${nextVersion}`;
             }
           } else {
-            const baseTag = latestGaTag();
-            const bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
+            baseTag = latestGaTag();
             const nextVersion = bumpVersion(baseTag, bumpType);
             tagName = `v${nextVersion}_rc`;
           }
 
-          const existing = run(`git tag -l '${tagName}'`);
-          if (existing) {
-            console.log(`Tag ${tagName} already exists; skipping.`);
-            process.exit(0);
-          }
-
-          run(`git tag ${tagName} ${targetSha}`);
-          run(`git push origin ${tagName}`);
-
-          fs.appendFileSync(env.GITHUB_OUTPUT, `tag=${tagName}\n`);
-          console.log(`Created ${tagName} from ${baseTag} using bump "${bumpType}" at ${targetSha}`);
+          tagAndPush(tagName, targetSha);
+          console.log(`Created ${tagName} from ${baseTag} (${bumpType}) at ${targetSha}`);
           NODE
 
       - name: Tag summary
@@ -443,7 +293,7 @@ jobs:
           {
             echo "## Manual tag"
             echo "- Tag: ${{ steps.manual.outputs.tag }}"
-            echo "- Commit: ${TARGET_SHA:-$(git rev-parse HEAD)}"
+            echo "- Commit: $(git rev-parse HEAD)"
             echo "- Channel: ${{ github.event.inputs.release_channel }}"
             echo "- Bump: ${{ github.event.inputs.bump_type }}"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -457,5 +307,5 @@ jobs:
           curl -sS -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches" \
             -d "{\"ref\":\"main\",\"inputs\":{\"tag_name\":\"${TAG_NAME}\"}}"
