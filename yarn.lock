@@ -729,7 +729,7 @@ eslint-plugin-react@^7.35.0:
     string.prototype.matchall "^4.0.12"
     string.prototype.repeat "^1.0.0"
 
-eslint-plugin-sonarjs@>=0.25.0:
+eslint-plugin-sonarjs@>=2.0.0:
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/eslint-plugin-sonarjs/-/eslint-plugin-sonarjs-4.0.1.tgz#9a3e34dc01a9d9a042fedbf4ae97cc379ed87395"
   integrity sha512-lmqzFTrw0/zpHQMRmwdgdEEw50s3md0c8RE23JqNom9ovsGQxC/azZ9H00aGKVDkxIXywfcxwzyFJ9Sm3bp2ng==

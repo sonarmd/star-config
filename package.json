@@ -3,6 +3,9 @@
   "version": "2.0.0",
   "description": "Opinionated, preconfigured dev tooling for SonarMD JavaScript and TypeScript projects.",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "packageManager": "yarn@1.22.22",
   "exports": {
     "./eslint": "./eslint/flat.mjs",
@@ -52,7 +55,7 @@
     "eslint-plugin-import": "^2.30.0",
     "eslint-plugin-react": "^7.35.0",
     "eslint-plugin-react-hooks": "^5.0.0",
-    "eslint-plugin-sonarjs": ">=0.25.0",
+    "eslint-plugin-sonarjs": ">=2.0.0",
     "globals": "^15.0.0"
   },
   "devDependencies": {
