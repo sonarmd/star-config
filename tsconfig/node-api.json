@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "@sonarmd/star-config — Node.js API (Express, etc.)",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "rootDir": ".",
+    "lib": ["ES2020"],
+    "noEmit": false,
+    "declaration": false
+  }
+}
