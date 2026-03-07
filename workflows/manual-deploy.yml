@@ -1,0 +1,52 @@
+# Managed by @sonarmd/star-config — changes will be overwritten on install.
+# Source: https://github.com/sonarmd/star-config
+name: Manual Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Deploy mode'
+        type: choice
+        required: true
+        default: staging
+        options:
+          - staging
+          - production
+          - redeploy
+          - custom
+      ref:
+        description: 'Branch to deploy (blank = smart default)'
+        type: string
+        default: ''
+      existing_tag:
+        description: 'Tag to redeploy (redeploy mode only)'
+        type: string
+        default: ''
+      custom_version:
+        description: 'Version number (custom mode only, e.g. 4.5.1)'
+        type: string
+        default: ''
+      custom_env:
+        description: 'Environment (custom mode only)'
+        type: choice
+        default: stg
+        options:
+          - dev
+          - stg
+          - prd
+
+permissions: {}
+
+jobs:
+  tag:
+    uses: sonarmd/workflows/.github/workflows/manual-deploy.yml@main
+    with:
+      mode:           ${{ inputs.mode }}
+      repo-short:     __REPO_SHORT__
+      ref:            ${{ inputs.ref }}
+      existing-tag:   ${{ inputs.existing_tag }}
+      custom-version: ${{ inputs.custom_version }}
+      custom-env:     ${{ inputs.custom_env }}
+    permissions:
+      contents: write
