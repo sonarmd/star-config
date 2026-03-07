@@ -1,15 +1,63 @@
 {
-  "name": "@sonarmd/star-config-monorepo",
-  "private": true,
-  "version": "1.0.0",
+  "name": "@sonarmd/star-config",
+  "version": "2.0.0",
+  "description": "Opinionated, preconfigured dev tooling for SonarMD JavaScript and TypeScript projects.",
+  "type": "module",
   "packageManager": "yarn@1.22.22",
-  "workspaces": [
-    "packages/*"
+  "exports": {
+    "./eslint": "./eslint/flat.mjs",
+    "./eslint/flat": "./eslint/flat.mjs",
+    "./eslint/legacy": "./eslint/legacy.cjs",
+    "./prettier": "./prettier.config.cjs",
+    "./tsconfig/base": "./tsconfig/base.json",
+    "./tsconfig/react-app": "./tsconfig/react-app.json",
+    "./tsconfig/node-api": "./tsconfig/node-api.json",
+    "./tsconfig/library": "./tsconfig/library.json",
+    "./lint-staged": "./lint-staged.config.cjs"
+  },
+  "files": [
+    "eslint/",
+    "tsconfig/",
+    "prettier.config.cjs",
+    "lint-staged.config.cjs"
   ],
-  "author": "SonarMD",
-  "license": "UNLICENSED",
   "scripts": {
-    "release:notes": "node scripts/generate-release-notes.js",
-    "release:pack": "node scripts/pack-and-checksum.js"
+    "lint": "eslint . && prettier --check .",
+    "test": "node --test 'test/*.test.mjs'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sonarmd/star-config.git"
+  },
+  "author": "SonarMD <engineering@sonarmd.com>",
+  "license": "UNLICENSED",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "peerDependencies": {
+    "eslint": ">=9.0.0",
+    "prettier": ">=3.0.0",
+    "typescript": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@eslint/js": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-import": "^2.30.0",
+    "eslint-plugin-react": "^7.35.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-sonarjs": ">=0.25.0",
+    "globals": "^15.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.7.0"
   }
 }
