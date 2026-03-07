@@ -36,13 +36,9 @@ module.exports = {
   rules: {
     // --- Safety ---
     eqeqeq: ['error', 'always', {null: 'ignore'}],
-    curly: ['error', 'all'],
     'no-implied-eval': 'error',
     'no-throw-literal': 'error',
     'no-var': 'error',
-
-    // --- Hygiene ---
-    'no-console': ['error', {allow: ['error', 'error']}],
     'no-debugger': 'error',
     'prefer-const': ['error', {destructuring: 'all'}],
 
@@ -57,16 +53,8 @@ module.exports = {
     '@typescript-eslint/no-empty-function': 'off',
     '@typescript-eslint/ban-ts-comment': ['error', {'ts-ignore': 'allow-with-description'}],
 
-    // --- Imports ---
+    // --- Imports (structural only) ---
     'import/first': 'error',
     'import/no-duplicates': 'error',
-    'import/order': [
-      'error',
-      {
-        groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index', 'object', 'type'],
-        alphabetize: {order: 'asc', caseInsensitive: true},
-        'newlines-between': 'always',
-      },
-    ],
   },
 };

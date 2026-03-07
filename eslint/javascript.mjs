@@ -51,57 +51,26 @@ const config = [
       'prefer-promise-reject-errors': 'error',
       'require-atomic-updates': 'error',
 
-      // --- Hygiene ---
+      // --- Hygiene (real bugs only) ---
       'no-unused-vars': ['error', {argsIgnorePattern: '^_', varsIgnorePattern: '^_'}],
-      'no-console': ['error', {allow: ['error', 'error']}],
       'no-debugger': 'error',
-      'no-alert': 'error',
       'no-var': 'error',
       'no-shadow': ['error', {builtinGlobals: false, hoist: 'functions'}],
       'no-use-before-define': ['error', {functions: false, classes: true, variables: true}],
-      'no-param-reassign': [
-        'error',
-        {props: true, ignorePropertyModificationsFor: ['acc', 'accumulator', 'draft', 'state']},
-      ],
-      'no-useless-concat': 'error',
-      'no-useless-return': 'error',
-      'no-lone-blocks': 'error',
       'prefer-const': ['error', {destructuring: 'all'}],
-      'prefer-template': 'error',
-      'consistent-return': 'error',
       eqeqeq: ['error', 'always', {null: 'ignore'}],
-      curly: ['error', 'all'],
 
-      // --- Imports ---
+      // --- Imports (structural only) ---
       'import/first': 'error',
       'import/export': 'error',
       'import/no-duplicates': 'error',
       'import/no-cycle': 'error',
       'import/no-mutable-exports': 'error',
-      'import/order': [
-        'error',
-        {
-          groups: [
-            'builtin',
-            'external',
-            'internal',
-            'parent',
-            'sibling',
-            'index',
-            'object',
-            'type',
-          ],
-          pathGroupsExcludedImportTypes: ['builtin'],
-          alphabetize: {order: 'asc', caseInsensitive: true},
-          'newlines-between': 'always',
-        },
-      ],
 
       // --- Complexity ---
       complexity: ['error', 12],
       'max-depth': ['error', 4],
       'sonarjs/cognitive-complexity': ['error', 15],
-      'sonarjs/no-duplicate-string': ['error', {threshold: 3}],
       'sonarjs/no-identical-functions': 'error',
       'sonarjs/no-collapsible-if': 'error',
       'sonarjs/no-redundant-jump': 'error',

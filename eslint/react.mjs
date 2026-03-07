@@ -34,8 +34,6 @@ const config = [
       'react/jsx-no-target-blank': ['error', {enforceDynamicLinks: 'always'}],
       'react/jsx-no-script-url': 'error',
       'react/jsx-no-leaked-render': 'error',
-      'react/jsx-no-useless-fragment': 'error',
-      'react/self-closing-comp': 'error',
 
       // Hooks
       'react-hooks/rules-of-hooks': 'error',
