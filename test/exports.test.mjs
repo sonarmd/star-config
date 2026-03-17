@@ -63,6 +63,38 @@ describe("@sonarmd/star-config exports", () => {
     assert.equal(config.compilerOptions.skipLibCheck, true);
   });
 
+  it("tsconfig node version presets target correct ES versions", () => {
+    const expected = {
+      node18: "ES2022",
+      node20: "ES2023",
+      node22: "ES2024",
+    };
+    for (const [preset, esTarget] of Object.entries(expected)) {
+      const raw = readFileSync(join(root, `tsconfig/${preset}.json`), "utf8");
+      const config = JSON.parse(raw);
+      assert.ok(config.extends, `${preset} should extend base`);
+      assert.equal(config.compilerOptions.target, esTarget, `${preset} target should be ${esTarget}`);
+      assert.equal(config.compilerOptions.module, "Node16", `${preset} module should be Node16`);
+    }
+  });
+
+  it("commitlint config extends conventional", async () => {
+    const {createRequire} = await import("node:module");
+    const require = createRequire(import.meta.url);
+    const config = require(join(root, "commitlint.config.cjs"));
+
+    assert.equal(typeof config, "object");
+    assert.ok(config.extends, "should have extends");
+    assert.ok(config.extends.includes("@commitlint/config-conventional"));
+    assert.ok(config.rules["type-enum"], "should have type-enum rule");
+  });
+
+  it("husky install script exists", () => {
+    const raw = readFileSync(join(root, "husky/install.mjs"), "utf8");
+    assert.ok(raw.includes("lint-staged"), "should reference lint-staged");
+    assert.ok(raw.includes("commitlint"), "should reference commitlint");
+  });
+
   it("tsconfig presets extend base", () => {
     for (const preset of ["react-app", "node-api", "library"]) {
       const raw = readFileSync(join(root, `tsconfig/${preset}.json`), "utf8");
