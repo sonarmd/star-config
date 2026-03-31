@@ -88,11 +88,6 @@ jobs:
             return tag;
           }
 
-          function latestRcTag() {
-            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
-            return tag;
-          }
-
           function latestRcBase() {
             const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
             return tag ? tag.replace(/_rc$/, "") : "";
@@ -250,6 +245,11 @@ jobs:
             return tag || "v0.0.0";
           }
 
+          function latestRcTag() {
+            const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*_rc' --sort=-version:refname | head -n 1");
+            return tag;
+          }
+
           function bumpVersion(version, type) {
             const parts = version.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
             let [major, minor, patch] = parts;
@@ -269,6 +269,7 @@ jobs:
           // Prefer promoting the latest RC (same version, without bump)
           const latestRc = latestRcTag();
           let tagName = "";
+          let tagSource = "";
           if (latestRc) {
             const base = latestRc.replace(/_rc$/, "");
             const existing = run(`git tag -l '${base}'`);
@@ -277,6 +278,7 @@ jobs:
               process.exit(0);
             }
             tagName = base;
+            tagSource = `promoted from ${latestRc}`;
           } else {
             let bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
             const commitMessage = run("git log -1 --pretty=%B").toLowerCase();
@@ -300,6 +302,7 @@ jobs:
             const nextVersion = bumpVersion(baseTag, bumpType);
             const suffix = env.TAG_SUFFIX || "";
             tagName = `v${nextVersion}${suffix}`;
+            tagSource = `bumped ${bumpType} from ${baseTag}`;
           }
 
           const existing = run(`git tag -l '${tagName}'`);
@@ -312,7 +315,7 @@ jobs:
           run(`git push origin ${tagName}`);
 
           fs.appendFileSync(env.GITHUB_OUTPUT, `tag=${tagName}\n`);
-          console.log(`Created ${tagName} from ${baseTag} using bump "${bumpType}" at ${targetSha}`);
+          console.log(`Created ${tagName} (${tagSource}) at ${targetSha}`);
           NODE
 
       - name: Tag summary
@@ -404,23 +407,27 @@ jobs:
           }
 
           let tagName = "";
+          let tagSource = "";
           const channel = (env.RELEASE_CHANNEL || "rc").toLowerCase();
 
           if (channel === "ga") {
             const rc = latestRcTag();
             if (rc) {
               tagName = rc.replace(/_rc$/, "");
+              tagSource = `promoted from ${rc}`;
             } else {
               const baseTag = latestGaTag();
               const bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
               const nextVersion = bumpVersion(baseTag, bumpType);
               tagName = `v${nextVersion}`;
+              tagSource = `bumped ${bumpType} from ${baseTag}`;
             }
           } else {
             const baseTag = latestGaTag();
             const bumpType = (env.BUMP_DEFAULT || "patch").toLowerCase();
             const nextVersion = bumpVersion(baseTag, bumpType);
             tagName = `v${nextVersion}_rc`;
+            tagSource = `bumped ${bumpType} from ${baseTag}`;
           }
 
           const existing = run(`git tag -l '${tagName}'`);
@@ -433,7 +440,7 @@ jobs:
           run(`git push origin ${tagName}`);
 
           fs.appendFileSync(env.GITHUB_OUTPUT, `tag=${tagName}\n`);
-          console.log(`Created ${tagName} from ${baseTag} using bump "${bumpType}" at ${targetSha}`);
+          console.log(`Created ${tagName} (${tagSource}) at ${targetSha}`);
           NODE
 
       - name: Tag summary
