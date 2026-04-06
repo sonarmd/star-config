@@ -23,6 +23,8 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
-      - run: npm publish --ignore-scripts
+      - run: yarn build
+
+      - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
