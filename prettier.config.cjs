@@ -6,17 +6,17 @@
 //   module.exports = require("@sonarmd/star-config/prettier");
 
 module.exports = {
-  arrowParens: "always",
+  arrowParens: 'always',
   bracketSpacing: false,
   bracketSameLine: true,
-  htmlWhitespaceSensitivity: "css",
+  htmlWhitespaceSensitivity: 'css',
   jsxSingleQuote: true,
   printWidth: 100,
-  proseWrap: "preserve",
-  quoteProps: "as-needed",
+  proseWrap: 'preserve',
+  quoteProps: 'as-needed',
   semi: true,
   singleQuote: true,
   tabWidth: 2,
-  trailingComma: "es5",
+  trailingComma: 'es5',
   useTabs: false,
 };
