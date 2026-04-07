@@ -16,5 +16,15 @@
     "sourceMap": true,
     "declaration": false,
     "incremental": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "out",
+    ".next",
+    "coverage",
+    ".claude",
+    "cdk.out"
+  ]
 }
