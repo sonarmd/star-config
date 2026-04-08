@@ -22,6 +22,7 @@
     "./lint-staged": "./lint-staged.config.cjs",
     "./commitlint": "./commitlint.config.cjs",
     "./husky/install": "./husky/install.mjs",
+    "./scripts/release-notes": "./scripts/generate-release-notes.js",
     "./iac/detect": {
       "import": "./dist/detect.js",
       "types": "./dist/detect.d.ts"
@@ -36,6 +37,7 @@
     "tsconfig/",
     "husky/",
     "iac/",
+    "scripts/",
     "dist/",
     "tsconfig.build.json",
     "prettier.config.cjs",

@@ -66,21 +66,6 @@ export default function starConfig(options = {}) {
   const includeIaC = iac === 'auto' ? isIaCProject(process.cwd()) : iac === true;
 
   return [
-    // Global ignores — standard patterns no project should lint.
-    {
-      ignores: [
-        'node_modules/',
-        'dist/',
-        'build/',
-        'out/',
-        '.next/',
-        'coverage/',
-        '.claude/',
-        'cdk.out/',
-        '**/*.min.js',
-        '**/*.bundle.js',
-      ],
-    },
     ...jsConfig,
     ...sonarConfig, // always-on: code quality + complexity
     ...securityConfig, // always-on: security best practices
