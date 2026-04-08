@@ -1,6 +1,6 @@
 {
   "name": "@sonarmd/star-config",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "Opinionated, preconfigured dev tooling for SonarMD JavaScript and TypeScript projects.",
   "type": "module",
   "packageManager": "yarn@1.22.22",
@@ -58,7 +58,8 @@
   "author": "SonarMD <engineering@sonarmd.com>",
   "license": "UNLICENSED",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
   },
   "peerDependencies": {
     "cdk-nag": ">=2.28.0",
