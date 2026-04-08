@@ -10,7 +10,7 @@ const config = [
     rules: {
       // IaC must use structured logging, not console.log.
       // Use a logger like @aws-lambda-powertools/logger or pino.
-      'no-console': ['error', {allow: []}],
+      'no-console': 'error',
 
       'no-restricted-syntax': [
         'error',

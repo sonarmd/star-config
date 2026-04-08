@@ -1,6 +1,6 @@
 {
   "name": "@sonarmd/star-config",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Opinionated, preconfigured dev tooling for SonarMD JavaScript and TypeScript projects.",
   "type": "module",
   "packageManager": "yarn@1.22.22",
