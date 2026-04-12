@@ -51,8 +51,21 @@ function packPackage(pkg) {
   return {...pkg, tarball: outputPath, checksum};
 }
 
+function ensureBuild() {
+  const buildMarker = path.join(distDir, 'detect.js');
+  if (!fs.existsSync(buildMarker)) {
+    // eslint-disable-next-line no-console
+    console.log('dist/ missing or incomplete — running yarn build');
+    const result = spawnSync('yarn', ['build'], {cwd: process.cwd(), stdio: 'inherit'});
+    if (result.status !== 0) {
+      throw new Error('yarn build failed');
+    }
+  }
+}
+
 function main() {
   fs.mkdirSync(distDir, {recursive: true});
+  ensureBuild();
 
   const packages = getPackages();
   const results = packages.map(packPackage);
