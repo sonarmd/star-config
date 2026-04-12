@@ -1,0 +1,38 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# Explicitly declare text files
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.cjs   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.jsx   text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.md    text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.sh    text eol=lf
+
+# JSONL audit logs — append-only, merge by keeping all lines from both sides
+*.jsonl text eol=lf merge=union
+
+# Binary files
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.zip   binary
+*.gz    binary
+*.tar   binary
+
+# Lock files — exact merge (fail on conflict, never auto-merge)
+yarn.lock       -diff merge=binary
+package-lock.json -diff merge=binary

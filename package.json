@@ -1,6 +1,6 @@
 {
   "name": "@sonarmd/star-config",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "description": "Opinionated, preconfigured dev tooling for SonarMD JavaScript and TypeScript projects.",
   "type": "module",
   "packageManager": "yarn@1.22.22",
@@ -22,7 +22,6 @@
     "./lint-staged": "./lint-staged.config.cjs",
     "./commitlint": "./commitlint.config.cjs",
     "./husky/install": "./husky/install.mjs",
-    "./scripts/release-notes": "./scripts/generate-release-notes.js",
     "./iac/detect": {
       "import": "./dist/detect.js",
       "types": "./dist/detect.d.ts"
@@ -30,19 +29,22 @@
     "./iac/cdk-nag": {
       "import": "./dist/cdk-nag.js",
       "types": "./dist/cdk-nag.d.ts"
-    }
+    },
+    "./dependabot/install": "./dependabot/install.mjs",
+    "./repo-setup/install": "./repo-setup/install.mjs"
   },
   "files": [
     "eslint/",
     "tsconfig/",
     "husky/",
     "iac/",
-    "scripts/",
     "dist/",
     "tsconfig.build.json",
     "prettier.config.cjs",
     "lint-staged.config.cjs",
-    "commitlint.config.cjs"
+    "commitlint.config.cjs",
+    "dependabot/",
+    "repo-setup/"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -58,8 +60,7 @@
   "author": "SonarMD <engineering@sonarmd.com>",
   "license": "UNLICENSED",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "restricted"
+    "registry": "https://npm.pkg.github.com"
   },
   "peerDependencies": {
     "cdk-nag": ">=2.28.0",
