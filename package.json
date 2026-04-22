@@ -35,7 +35,10 @@
     "./semgrep/baseline": "./semgrep/baseline.yml",
     "./gitleaks/default": "./gitleaks/default.toml",
     "./trivy/config": "./trivy/config.yaml",
-    "./security/install": "./security/install.mjs"
+    "./security/install": "./security/install.mjs",
+    "./jscpd/default": "./jscpd/default.json",
+    "./knip/default": "./knip/default.json",
+    "./quality/coverage": "./quality/coverage.cjs"
   },
   "files": [
     "eslint/",
@@ -52,7 +55,10 @@
     "semgrep/",
     "gitleaks/",
     "trivy/",
-    "security/"
+    "security/",
+    "jscpd/",
+    "knip/",
+    "quality/"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

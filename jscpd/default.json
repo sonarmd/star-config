@@ -1,0 +1,38 @@
+{
+  "$comment": "@sonarmd/star-config — jscpd (cross-file duplication detector) baseline. Fails when duplicated tokens exceed 1% of the codebase. Sonarjs already catches within-function duplication via lint; this fills the cross-file gap.",
+  "threshold": 1.0,
+  "min-lines": 10,
+  "min-tokens": 70,
+  "absolute": true,
+  "gitignore": true,
+  "reporters": ["console", "markdown"],
+  "output": "./jscpd-report",
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.next/**",
+    "**/.nuxt/**",
+    "**/coverage/**",
+    "**/*.snap",
+    "**/*.d.ts",
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/test/**",
+    "**/tests/**",
+    "**/fixtures/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.lock",
+    "**/*.lock.json",
+    "**/archive/**",
+    "**/.claude/**",
+    "**/.husky/**",
+    "**/public/**",
+    "**/static/**"
+  ],
+  "formatsExts": {
+    "typescript": ["ts", "tsx"],
+    "javascript": ["js", "jsx", "mjs", "cjs"]
+  }
+}
