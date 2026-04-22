@@ -1,6 +1,6 @@
 {
   "name": "@sonarmd/star-config",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Opinionated, preconfigured dev tooling for SonarMD JavaScript and TypeScript projects.",
   "type": "module",
   "packageManager": "yarn@1.22.22",
@@ -31,7 +31,11 @@
       "types": "./dist/cdk-nag.d.ts"
     },
     "./dependabot/install": "./dependabot/install.mjs",
-    "./repo-setup/install": "./repo-setup/install.mjs"
+    "./repo-setup/install": "./repo-setup/install.mjs",
+    "./semgrep/baseline": "./semgrep/baseline.yml",
+    "./gitleaks/default": "./gitleaks/default.toml",
+    "./trivy/config": "./trivy/config.yaml",
+    "./security/install": "./security/install.mjs"
   },
   "files": [
     "eslint/",
@@ -44,7 +48,11 @@
     "lint-staged.config.cjs",
     "commitlint.config.cjs",
     "dependabot/",
-    "repo-setup/"
+    "repo-setup/",
+    "semgrep/",
+    "gitleaks/",
+    "trivy/",
+    "security/"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
