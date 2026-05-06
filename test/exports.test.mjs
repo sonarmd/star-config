@@ -13,8 +13,8 @@ const flatConfigPath = join(root, 'eslint/flat.mjs');
 const sonarConfigPath = join(root, 'eslint/sonar.mjs');
 const securityConfigPath = join(root, 'eslint/security.mjs');
 const iacConfigPath = join(root, 'eslint/iac.mjs');
-const detectPath = join(root, 'dist/detect.js');
-const cdkNagPath = join(root, 'dist/cdk-nag.js');
+const detectPath = join(root, 'dist/iac/detect.js');
+const cdkNagPath = join(root, 'dist/iac/cdk-nag.js');
 
 const LAYER_SONAR = 'star-config/sonar';
 const LAYER_SECURITY = 'star-config/security';

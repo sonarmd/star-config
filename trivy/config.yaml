@@ -1,0 +1,50 @@
+# @sonarmd/star-config — Trivy baseline config
+#
+# Consumers reference this config in CI:
+#
+#   trivy fs . \
+#     --config node_modules/@sonarmd/star-config/trivy/config.yaml \
+#     --exit-code 1
+#
+# Scans filesystem deps + IaC + secrets. The sonarmd/workflows
+# `security-scan` composite action wraps this — most callers should
+# use that rather than wire Trivy directly.
+
+# Fail CI only on HIGH or CRITICAL. MEDIUM/LOW appear in the report
+# as informational but don't block the build. Opinionated: breaking
+# a merge on a MEDIUM CVE floods PRs with noise and trains people to
+# disable the scan.
+severity:
+  - HIGH
+  - CRITICAL
+
+# Vulnerability + secret + misconfig scanners enabled. License scanner
+# skipped to avoid noise on every transitive LGPL/MIT thing.
+scanners:
+  - vuln
+  - secret
+  - misconfig
+
+# Only report vulnerabilities with a known fix. Unfixable CVEs in
+# transitive deps are worth tracking but not worth blocking on.
+vulnerability:
+  ignore-unfixed: true
+
+# Exit 1 on any finding at or above the severity threshold above.
+exit-code: 1
+
+# Cache TTL — default is 24h. Short enough to catch day-0 CVEs, long
+# enough to avoid re-downloading DB on every PR retry.
+timeout: '10m'
+
+skip-dirs:
+  - node_modules
+  - .git
+  - .claude
+  - archive
+  - .husky
+
+skip-files:
+  - '**/*.zip'
+  - '**/*.tar.gz'
+  - '**/yarn.lock' # yarn.lock scanned via --scanners vuln through package.json

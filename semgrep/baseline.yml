@@ -1,0 +1,41 @@
+# @sonarmd/star-config — Semgrep baseline rules
+#
+# This file ships opinionated SonarMD-specific Semgrep rules. Consumers
+# invoke Semgrep in CI with a stack of public rulesets plus this file:
+#
+#   semgrep scan \
+#     --config p/default \
+#     --config p/typescript \
+#     --config p/react \
+#     --config p/nodejs \
+#     --config p/owasp-top-ten \
+#     --config node_modules/@sonarmd/star-config/semgrep/baseline.yml \
+#     --error --severity ERROR
+#
+# The sonarmd/workflows `security-scan` composite action wraps this
+# invocation — most callers should use that rather than wire Semgrep
+# directly.
+#
+# Add rules below as patterns are identified. Start empty; grow
+# deliberately. Every rule costs developer attention when it fires.
+
+rules:
+  - id: sonarmd-no-direct-process-env-in-app-code
+    message: |
+      Read environment variables through the central config loader, not
+      `process.env` scattered through the app. Central loading enables
+      validation, defaults, and auditability for SOC2.
+    severity: WARNING
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: process.env.$VAR
+      - pattern-not-inside: |
+          // @allow-process-env
+          ...
+    paths:
+      exclude:
+        - '**/config/**'
+        - '**/scripts/**'
+        - '**/*.config.*'
+        - '**/test/**'
+        - '**/__tests__/**'

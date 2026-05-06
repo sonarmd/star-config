@@ -1,0 +1,55 @@
+# @sonarmd/star-config — Gitleaks baseline config
+#
+# Consumers reference this config in CI:
+#
+#   gitleaks detect --source . \
+#     --config node_modules/@sonarmd/star-config/gitleaks/default.toml \
+#     --no-git -v --exit-code 1
+#
+# The sonarmd/workflows `security-scan` composite action wraps this —
+# most callers should use that rather than wire Gitleaks directly.
+
+title = "SonarMD Gitleaks baseline"
+
+# Extend the built-in rule set (AWS, GCP, generic API keys, private keys,
+# OAuth tokens, Slack, Stripe, JWTs, etc). Pulls the rules from gitleaks'
+# embedded default config — any paths we allowlist below still apply.
+[extend]
+useDefault = true
+
+# ── Repo-wide allowlist ──────────────────────────────────────────────
+# High-confidence false positives. Add regex that matches example/test
+# data only, never real secrets.
+[allowlist]
+description = "SonarMD — false-positive patterns across repos"
+paths = [
+  '''(?i)(^|/)(test|__tests__|fixtures|mocks|snapshots)/''',
+  '''(?i)node_modules/''',
+  '''(?i)\.husky/''',
+  '''(?i)/examples?/''',
+  '''(?i)/docs?/''',
+  '''^archive/pre-collapse-workflows-.*\.zip$''',
+]
+regexes = [
+  # 1Password op:// references — these are secret REFERENCES, not the
+  # secret itself. Star-config specifically standardizes on op:// URIs
+  # for all secret injection via Agora.
+  '''op://[A-Za-z0-9._/-]+''',
+
+  # Common placeholder strings used in docs/examples
+  '''(?i)(xxx+|your[-_]?(api[-_]?)?key|dummy|example|placeholder)''',
+
+  # SHA-like strings in CHANGELOG and commit-log snippets
+  '''(?i)commit[- ]?[0-9a-f]{7,40}''',
+]
+
+# ── Organization-specific secret patterns (opt-in) ───────────────────
+# If sonarmd issues custom token formats (e.g. prefixed with `sm_`),
+# add patterns here so they're caught even if gitleaks doesn't ship
+# a builtin rule. Example below is a template, kept commented out.
+#
+# [[rules]]
+# id = "sonarmd-internal-token"
+# description = "SonarMD-issued internal auth token"
+# regex = '''sm_[a-zA-Z0-9]{32,}'''
+# tags = ["sonarmd", "internal"]

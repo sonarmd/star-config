@@ -25,15 +25,8 @@ module.exports = {
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
     'plugin:import/recommended',
-    'plugin:import/typescript',
     'prettier',
   ],
-  settings: {
-    'import/resolver': {
-      typescript: true,
-      node: true,
-    },
-  },
   rules: {
     // --- Safety ---
     eqeqeq: ['error', 'always', {null: 'ignore'}],
@@ -56,8 +49,8 @@ module.exports = {
     '@typescript-eslint/explicit-member-accessibility': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-empty-function': 'off',
-    '@typescript-eslint/no-empty-interface': 'off',
-    '@typescript-eslint/no-var-requires': 'off',
+    '@typescript-eslint/no-empty-object-type': 'off',
+    '@typescript-eslint/no-require-imports': 'off',
     '@typescript-eslint/ban-ts-comment': ['warn', {'ts-ignore': 'allow-with-description'}],
 
     // --- Imports ---

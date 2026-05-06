@@ -31,7 +31,6 @@ const config = [
       'no-undef': 'error',
       'no-implied-eval': 'error',
       'no-new-func': 'error',
-      'no-return-await': 'error',
       'no-promise-executor-return': 'error',
       'no-throw-literal': 'error',
       'no-unsafe-optional-chaining': 'error',

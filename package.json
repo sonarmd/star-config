@@ -1,9 +1,12 @@
 {
   "name": "@sonarmd/star-config",
-  "version": "3.2.0",
+  "version": "4.0.0",
   "description": "Opinionated, preconfigured dev tooling for SonarMD JavaScript and TypeScript projects.",
   "type": "module",
   "packageManager": "yarn@1.22.22",
+  "engines": {
+    "node": ">=18"
+  },
   "exports": {
     "./eslint": "./eslint/flat.mjs",
     "./eslint/flat": "./eslint/flat.mjs",
@@ -23,15 +26,25 @@
     "./commitlint": "./commitlint.config.cjs",
     "./husky/install": "./husky/install.mjs",
     "./iac/detect": {
-      "import": "./dist/detect.js",
-      "types": "./dist/detect.d.ts"
+      "import": "./dist/iac/detect.js",
+      "types": "./dist/iac/detect.d.ts"
     },
     "./iac/cdk-nag": {
-      "import": "./dist/cdk-nag.js",
-      "types": "./dist/cdk-nag.d.ts"
+      "import": "./dist/iac/cdk-nag.js",
+      "types": "./dist/iac/cdk-nag.d.ts"
     },
     "./dependabot/install": "./dependabot/install.mjs",
-    "./repo-setup/install": "./repo-setup/install.mjs"
+    "./repo-setup/install": "./repo-setup/install.mjs",
+    "./semgrep/baseline": "./semgrep/baseline.yml",
+    "./gitleaks/default": "./gitleaks/default.toml",
+    "./trivy/config": "./trivy/config.yaml",
+    "./security/install": "./dist/security/install.js",
+    "./jscpd/default": "./jscpd/default.json",
+    "./knip/default": "./knip/default.json",
+    "./quality/coverage": {
+      "import": "./dist/quality/coverage.js",
+      "types": "./dist/quality/coverage.d.ts"
+    }
   },
   "files": [
     "eslint/",
@@ -39,14 +52,22 @@
     "husky/",
     "iac/",
     "dist/",
+    "workflows/",
+    "scripts/postinstall-entry.mjs",
     "tsconfig.build.json",
     "prettier.config.cjs",
     "lint-staged.config.cjs",
     "commitlint.config.cjs",
     "dependabot/",
-    "repo-setup/"
+    "repo-setup/",
+    "semgrep/",
+    "gitleaks/",
+    "trivy/",
+    "jscpd/",
+    "knip/"
   ],
   "scripts": {
+    "postinstall": "node scripts/postinstall-entry.mjs",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint . && prettier --check .",
     "test": "yarn build && node --test 'test/*.test.mjs'",
@@ -77,19 +98,20 @@
     }
   },
   "dependencies": {
-    "@commitlint/cli": "^19.0.0",
-    "@commitlint/config-conventional": "^19.0.0",
+    "@commitlint/cli": "^20.0.0",
+    "@commitlint/config-conventional": "^20.0.0",
     "@eslint/js": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "eslint-config-prettier": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-import": "^2.30.0",
     "eslint-plugin-react": "^7.35.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-security": "^4.0.0",
-    "eslint-plugin-sonarjs": ">=0.25.0",
+    "eslint-plugin-sonarjs": ">=2.0.0",
     "globals": "^15.0.0",
-    "husky": "^9.0.0"
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0"
   },
   "devDependencies": {
     "eslint": "^9.0.0",

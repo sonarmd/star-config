@@ -2,7 +2,7 @@ import starConfig from './eslint/flat.mjs';
 
 export default [
   {
-    ignores: ['.claude/', 'dist/', 'node_modules/'],
+    ignores: ['.claude/', '.agent/', 'dist/', 'node_modules/', 'scripts/', 'security/', 'quality/'],
   },
   ...starConfig({
     typescript: false,

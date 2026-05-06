@@ -6,6 +6,6 @@
 //   module.exports = require("@sonarmd/star-config/lint-staged");
 
 module.exports = {
-  '*.{ts,tsx,js,jsx}': ['prettier --write', 'eslint --max-warnings 0'],
+  '*.{ts,tsx,js,jsx}': ['prettier --write', 'eslint --no-warn-ignored --max-warnings 0'],
   '*.{json,md,yml,yaml}': ['prettier --write'],
 };
