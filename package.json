@@ -63,25 +63,42 @@
     "registry": "https://npm.pkg.github.com"
   },
   "peerDependencies": {
+    "@commitlint/cli": ">=19.0.0",
+    "@commitlint/config-conventional": ">=19.0.0",
+    "@eslint/js": ">=9.0.0",
+    "@typescript-eslint/eslint-plugin": ">=8.0.0",
+    "@typescript-eslint/parser": ">=8.0.0",
     "cdk-nag": ">=2.28.0",
     "eslint": ">=9.0.0",
+    "eslint-config-prettier": ">=9.0.0",
+    "eslint-plugin-import": ">=2.30.0",
+    "eslint-plugin-react": ">=7.35.0",
+    "eslint-plugin-react-hooks": ">=5.0.0",
+    "eslint-plugin-security": ">=4.0.0",
+    "eslint-plugin-sonarjs": ">=0.25.0",
+    "globals": ">=15.0.0",
+    "husky": ">=9.0.0",
     "prettier": ">=3.0.0",
     "typescript": ">=5.0.0"
   },
   "peerDependenciesMeta": {
-    "cdk-nag": {
-      "optional": true
-    },
-    "typescript": {
-      "optional": true
-    }
+    "@commitlint/cli": { "optional": true },
+    "@commitlint/config-conventional": { "optional": true },
+    "@typescript-eslint/eslint-plugin": { "optional": true },
+    "@typescript-eslint/parser": { "optional": true },
+    "cdk-nag": { "optional": true },
+    "eslint-plugin-react": { "optional": true },
+    "eslint-plugin-react-hooks": { "optional": true },
+    "husky": { "optional": true },
+    "typescript": { "optional": true }
   },
-  "dependencies": {
+  "devDependencies": {
     "@commitlint/cli": "^19.0.0",
     "@commitlint/config-conventional": "^19.0.0",
     "@eslint/js": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-import": "^2.30.0",
     "eslint-plugin-react": "^7.35.0",
@@ -89,10 +106,7 @@
     "eslint-plugin-security": "^4.0.0",
     "eslint-plugin-sonarjs": ">=0.25.0",
     "globals": "^15.0.0",
-    "husky": "^9.0.0"
-  },
-  "devDependencies": {
-    "eslint": "^9.0.0",
+    "husky": "^9.0.0",
     "prettier": "^3.3.0",
     "typescript": "^5.7.0"
   }
