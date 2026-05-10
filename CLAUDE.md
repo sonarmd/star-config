@@ -125,11 +125,42 @@ Fails the build on 12 critical rules (S3 encryption, RDS encryption, public acce
 
 ## Publishing
 
-Tagging triggers the release workflow:
+Tagging is the only thing this repo does. Publishing happens out-of-band via Ansible — the controller pulls new tags from GitHub, runs `yarn build && yarn pack`, and publishes the tarball to the SonarMD private registry on the tailnet.
 
 ```bash
-git tag v3.0.0
-git push origin v3.0.0
+git tag v4.0.1
+git push origin v4.0.1
 ```
 
-The GitHub Actions workflow builds (`yarn build`), packs, checksums, and publishes to GitHub Packages (`npm.pkg.github.com`).
+That's it. No `.github/workflows/publish.yml`. No registry token in CI. No `publishConfig` in `package.json`. The repo is a build artifact source; Ansible owns the publish step.
+
+The registry itself runs on the tailnet (Verdaccio + S3 storage backend). Authentication is by tailnet membership — the registry has no users database. Anyone on the tailnet can install; only the Ansible controller node can publish (enforced by tailnet ACLs).
+
+## Install UX (the whole point of v4)
+
+Consumers install with **zero config** beyond a one-time per-machine setup:
+
+```bash
+# one time per machine, by the dev:
+bash node_modules/@sonarmd/star-config/scripts/dev-setup.sh
+# from then on:
+yarn add @sonarmd/star-config
+```
+
+In CI, consumers add **one line** to their workflow:
+
+```yaml
+- uses: sonarmd/star-config/actions/install@v4
+  with:
+    ts-oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    ts-oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+```
+
+`TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` are set once at the GitHub **organization** level. Every repo inherits them. No per-repo secrets, no `.npmrc` checked in anywhere.
+
+## What v4 Removed (compared to v3)
+
+- The `postinstall` puppet-master script. No longer mutates consumer `package.json`, no longer auto-injects workflows or husky hooks, no longer creates `.lintstagedrc.mjs`. Consumers opt in to whatever they want, when they want.
+- The GHP publish workflow and `publishConfig.registry` pin.
+- The `.npmrc` registry-mapping line that consumers had to mirror.
+- `husky` and `lint-staged` from `dependencies` (now devDependencies — consumers install themselves if they want them).
