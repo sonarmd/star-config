@@ -17,5 +17,5 @@
     "sourceMap": true,
     "noEmit": false
   },
-  "include": ["iac/**/*.ts", "scripts/postinstall.ts", "security/install.ts", "quality/coverage.ts"]
+  "include": ["iac/**/*.ts", "security/install.ts", "quality/coverage.ts"]
 }

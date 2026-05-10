@@ -1,5 +1,7 @@
-# Managed by @sonarmd/star-config — changes will be overwritten on install.
-# Source: https://github.com/sonarmd/star-config
+# Example caller for the reusable manual-deploy workflow at sonarmd/workflows.
+# Copy to .github/workflows/manual-deploy.yml in your consumer repo and replace
+# __REPO_SHORT__ with your repo's tag prefix (e.g. "api", "fe", "mobile").
+# This is a starting point — edit it to fit your project. Not auto-injected.
 name: Manual Deploy
 
 on:

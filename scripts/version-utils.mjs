@@ -6,7 +6,9 @@ export function run(cmd) {
 }
 
 export function latestGaTag() {
-  const tag = run("git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | grep -v '_rc' | head -n 1");
+  const tag = run(
+    "git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | grep -v '_rc' | head -n 1"
+  );
   return tag || 'v0.0.0';
 }
 
@@ -16,21 +18,31 @@ export function latestRcTag() {
 }
 
 export function bumpVersion(version, type) {
-  const parts = version.replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+  const parts = version
+    .replace(/^v/, '')
+    .split('.')
+    .map((n) => parseInt(n, 10) || 0);
   let [major, minor, patch] = parts;
-  if (type === 'major') { major++; minor = 0; patch = 0; }
-  else if (type === 'minor') { minor++; patch = 0; }
-  else { patch++; }
+  if (type === 'major') {
+    major++;
+    minor = 0;
+    patch = 0;
+  } else if (type === 'minor') {
+    minor++;
+    patch = 0;
+  } else {
+    patch++;
+  }
   return `${major}.${minor}.${patch}`;
 }
 
 export function detectBumpType(commitMessage, prTitle, labels = []) {
-  const labelNames = labels.map(l => (l.name || '').toLowerCase());
+  const labelNames = labels.map((l) => (l.name || '').toLowerCase());
   const majorLabels = new Set(['semver:major', 'release:major', 'version:major', 'major']);
   const minorLabels = new Set(['semver:minor', 'release:minor', 'version:minor', 'minor']);
 
-  if (labelNames.some(n => majorLabels.has(n))) return 'major';
-  if (labelNames.some(n => minorLabels.has(n))) return 'minor';
+  if (labelNames.some((n) => majorLabels.has(n))) return 'major';
+  if (labelNames.some((n) => minorLabels.has(n))) return 'minor';
 
   const msg = (commitMessage + ' ' + prTitle).toLowerCase();
   if (/\[major\]|#major/.test(msg)) return 'major';

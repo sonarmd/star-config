@@ -52,8 +52,6 @@
     "husky/",
     "iac/",
     "dist/",
-    "workflows/",
-    "scripts/postinstall-entry.mjs",
     "tsconfig.build.json",
     "prettier.config.cjs",
     "lint-staged.config.cjs",
@@ -67,7 +65,6 @@
     "knip/"
   ],
   "scripts": {
-    "postinstall": "node scripts/postinstall-entry.mjs",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint . && prettier --check .",
     "test": "yarn build && node --test 'test/*.test.mjs'",
@@ -109,12 +106,13 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-security": "^4.0.0",
     "eslint-plugin-sonarjs": ">=2.0.0",
-    "globals": "^15.0.0",
-    "husky": "^9.0.0",
-    "lint-staged": "^15.0.0"
+    "globals": "^15.0.0"
   },
   "devDependencies": {
+    "@types/node": "^25.6.2",
     "eslint": "^9.0.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
     "prettier": "^3.3.0",
     "typescript": "^5.7.0"
   }
