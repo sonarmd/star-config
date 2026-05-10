@@ -1,0 +1,50 @@
+name: 'Install with star-config registry'
+description: >
+  Brings the runner onto the SonarMD tailnet, points npm at the private
+  registry, and runs yarn install. The runner authenticates by tailnet
+  membership — no NPM token, no .npmrc commit, no GitHub-to-AWS trust.
+
+inputs:
+  registry:
+    description: 'Private npm registry URL (must be reachable on the tailnet)'
+    required: false
+    default: 'https://npm.sonarmd.ts.net'
+  ts-oauth-client-id:
+    description: 'Tailscale OAuth client ID (set as a GitHub org secret)'
+    required: true
+  ts-oauth-secret:
+    description: 'Tailscale OAuth secret (set as a GitHub org secret)'
+    required: true
+  ts-tags:
+    description: 'Tailscale ACL tags applied to the ephemeral runner'
+    required: false
+    default: 'tag:ci'
+  install-command:
+    description: 'Command to run after registry is configured'
+    required: false
+    default: 'yarn install --frozen-lockfile'
+  working-directory:
+    description: 'Working directory for the install command'
+    required: false
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - name: Bring runner onto the tailnet
+      uses: tailscale/github-action@v3
+      with:
+        oauth-client-id: ${{ inputs.ts-oauth-client-id }}
+        oauth-secret: ${{ inputs.ts-oauth-secret }}
+        tags: ${{ inputs.ts-tags }}
+
+    - name: Point npm at the private registry
+      shell: bash
+      run: |
+        echo "registry=${{ inputs.registry }}" > "$RUNNER_TEMP/.npmrc"
+        echo "NPM_CONFIG_USERCONFIG=$RUNNER_TEMP/.npmrc" >> "$GITHUB_ENV"
+
+    - name: Install
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: ${{ inputs.install-command }}
