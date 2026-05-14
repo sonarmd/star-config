@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/setup-node@49933ea5288caeca8642195f2ed94f21bf2f2e36 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
       - name: Create RC tag
@@ -97,7 +97,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642195f2ed94f21bf2f2e36 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
       - name: Create GA tag
@@ -162,7 +162,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: main
-      - uses: actions/setup-node@49933ea5288caeca8642195f2ed94f21bf2f2e36 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
       - name: Create tag
