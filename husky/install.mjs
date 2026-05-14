@@ -33,7 +33,7 @@ const huskyBin = [
 if (!huskyBin) {
   console.error(
     'star-config: husky binary not found. Expected node_modules/husky/bin.js. ' +
-    'Did `yarn install` complete successfully?',
+      'Did `yarn install` complete successfully?'
   );
   process.exit(1);
 }
