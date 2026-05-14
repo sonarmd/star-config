@@ -50,9 +50,7 @@
     "eslint/",
     "tsconfig/",
     "husky/",
-    "iac/",
     "dist/",
-    "tsconfig.build.json",
     "prettier.config.cjs",
     "lint-staged.config.cjs",
     "commitlint.config.cjs",
@@ -68,7 +66,7 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint . && prettier --check .",
     "test": "yarn build && node --test 'test/*.test.mjs'",
-    "prepare": "husky",
+    "prepare": "yarn build",
     "prepublishOnly": "yarn build"
   },
   "repository": {
